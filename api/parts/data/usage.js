@@ -1,5 +1,6 @@
 var usage = {},
     common = require('./../../utils/common.js'),
+    langs = require('./../../utils/langs.js'),
     geoip = require('geoip-lite'),
     time = require('time')(Date);
 
@@ -256,6 +257,9 @@ var usage = {},
                 // We don't need to put hourly fragment to the unique levels array since
                 // we will store hourly data only in sessions collection
                 updateSessions[params.time.hourly + '.' + common.dbMap['unique']] = 1;
+                if (messagingTokenKeys(dbAppUser).length) {
+                    updateSessions[params.time.hourly + '.' + common.dbMap['messaging-enabled']] = 1;
+                }
             }
 
             if (userLastSeenTimestamp < (params.time.timestamp - secInHour)) {
@@ -276,8 +280,16 @@ var usage = {},
                 updateUsers[uniqueLevels[i] + '.' + common.dbMap['frequency'] + '.' + calculatedFrequency] = 1;
                 updateUsers[uniqueLevels[i] + '.' + common.dbMap['loyalty'] + '.' + calculatedLoyaltyRange] = 1;
 
+                if (messagingTokenKeys(dbAppUser).length) {
+                    updateSessions[uniqueLevels[i] + '.' + common.dbMap['messaging-enabled']] = 1;
+                    updateLocations[uniqueLevels[i] + '.' + params.user.country + '.' + common.dbMap['messaging-enabled']] = 1;
+                }
+
                 if (common.config.api.city_data !== false) {
                     updateCities[uniqueLevels[i] + '.' + params.user.city + '.' + common.dbMap['unique']] = 1;
+                    if (messagingTokenKeys(dbAppUser).length) {
+                        updateCities[uniqueLevels[i] + '.' + params.user.city + '.' + common.dbMap['messaging-enabled']] = 1;
+                    }
                 }
             }
 
@@ -323,6 +335,43 @@ var usage = {},
         processMetrics(dbAppUser, uniqueLevels, params);
     }
 
+    usage.processChangedMessagingToken = function(dbAppUser, params) {
+        var updateSessions = {};
+
+        // unique messaging sessions
+        common.fillTimeObject(params, updateSessions, common.dbMap['messaging-enabled']);
+        common.db.collection('sessions').update({'_id': params.app_id}, {'$inc': updateSessions}, {'upsert': true});
+
+        // language - users distributions
+        if (dbAppUser[common.dbUserMap['locale']]) {
+            var locale = dbAppUser[common.dbUserMap['locale']], lang = langs.languageFromLocale(locale),
+                tmpTimeObj = {}, tmpSet = {'meta.langs': lang};
+
+            console.log('User: %j with tokens %j', dbAppUser, dbAppUser[common.dbUserMap['tokens']]);
+            var keys = messagingTokenAndPlatformsKeys(dbAppUser);
+            if (keys.length) common.fillTimeObject(params, tmpTimeObj, lang + '.' + common.dbMap['messaging-enabled']);
+            for (var i in keys) common.fillTimeObject(params, tmpTimeObj, lang + '.' + keys[i]);
+           
+            common.db.collection('langs').update({'_id': params.app_id}, {'$inc': tmpTimeObj, '$addToSet': tmpSet}, {'upsert': true});
+        }
+
+        // countries
+        if (dbAppUser[common.dbUserMap['country_code']]) {
+            var updateLocations = {};
+            common.fillTimeObject(params, updateLocations, dbAppUser[common.dbUserMap['country_code']] + '.' + common.dbMap['messaging-enabled']);
+            common.db.collection('locations').update({'_id': params.app_id}, {'$inc': updateLocations}, {'upsert': true});
+        }
+
+        // cities
+        if (dbAppUser[common.dbUserMap['city']] && common.config.api.city_data !== false) {
+            // Not only for app country?
+            // var updateCities = {};
+            // common.fillTimeObject(params, updateCities, dbAppUser[common.dbUserMap['city']] + '.' + common.dbMap['messaging-enabled']);
+            // common.db.collection('cities').update({'_id': params.app_id}, {'$inc': updateCities}, {'upsert': true});
+        }
+
+    };
+
     function processMetrics(user, uniqueLevels, params) {
 
         var userProps = {},
@@ -359,6 +408,15 @@ var usage = {},
             return false;
         }
 
+        if (params.qstring.metrics._locale) {
+            var locale = params.qstring.metrics._locale, lang = langs.languageFromLocale(locale);
+            params.qstring.metrics._lang = lang;
+
+            if (isNewUser || user[common.dbUserMap['locale']] != locale) {
+                userProps[common.dbUserMap['locale']] = locale;
+            }
+        } 
+
         var predefinedMetrics = [
             { db: "devices", metrics: [{ name: "_device", set: "devices", short_code: common.dbUserMap['device'] }] },
             { db: "carriers", metrics: [{ name: "_carrier", set: "carriers", short_code: common.dbUserMap['carrier'] }] },
@@ -367,7 +425,8 @@ var usage = {},
                 { name: "_os_version", set: "os_versions", short_code: common.dbUserMap['platform_version'] },
                 { name: "_resolution", set: "resolutions" },
                 { name: "_density", set: "densities" }] },
-            { db: "app_versions", metrics: [{ name: "_app_version", set: "app_versions", short_code: common.dbUserMap['app_version'] }] }
+            { db: "app_versions", metrics: [{ name: "_app_version", set: "app_versions", short_code: common.dbUserMap['app_version'] }] },
+            { db: "langs", metrics: [{ name: "_lang", set: "langs", short_code: common.dbUserMap['lang'] }] }
         ];
 
         for (var i=0; i < predefinedMetrics.length; i++) {
@@ -390,9 +449,19 @@ var usage = {},
                         common.fillTimeObject(params, tmpTimeObj, escapedMetricVal + '.' + common.dbMap['unique']);
                     } else if (tmpMetric.short_code && user[tmpMetric.short_code] != escapedMetricVal) {
                         common.fillTimeObject(params, tmpTimeObj, escapedMetricVal + '.' + common.dbMap['unique']);
+                        if (tmpMetric.name === '_lang') {
+                            var keys = messagingTokenAndPlatformsKeys(user);
+                            if (keys.length) common.fillTimeObject(params, tmpTimeObj, escapedMetricVal + '.' + common.dbMap['messaging-enabled']);
+                            for (var i in keys) common.fillTimeObject(params, tmpTimeObj, escapedMetricVal + '.' + keys[i]);
+                        }
                     } else {
                         for (var k=0; k < uniqueLevels.length; k++) {
                             tmpTimeObj[uniqueLevels[k] + '.' + escapedMetricVal + '.' + common.dbMap['unique']] = 1;
+                            if (tmpMetric.name === '_lang') {
+                                var keys = messagingTokenAndPlatformsKeys(user);
+                                if (keys.length) tmpTimeObj[uniqueLevels[k] + '.' + escapedMetricVal + '.' + common.dbMap['messaging-enabled']] = 1;
+                                for (var i in keys) tmpTimeObj[uniqueLevels[k] + '.' + escapedMetricVal + '.' + keys[i]] = 1;
+                            }
                         }
                     }
 
@@ -413,6 +482,23 @@ var usage = {},
         // sc: session count. common.dbUserMap is not used here for readability purposes.
         common.db.collection('app_users' + params.app_id).update({'_id':params.app_user_id}, {'$inc':{'sc':1}, '$set':userProps}, {'upsert':true}, function () {
         });
+    }
+
+    function messagingTokenKeys(dbAppUser) {
+        var a = [];
+        for (var k in dbAppUser[common.dbUserMap.tokens]) a.push(common.dbUserMap.tokens + '.' + k);
+        return a;
+    }
+
+    function messagingTokenAndPlatformsKeys(dbAppUser) {
+        var a = [];
+        for (var k in dbAppUser[common.dbUserMap.tokens]) {
+            a.push(common.dbUserMap.tokens + '.' + k);
+            if (a.indexOf(common.dbUserMap.tokens + '.' + k.charAt(0)) !== -1) {
+                a.push(common.dbUserMap.tokens + '.' + k.charAt(0));
+            }
+        }
+        return a;
     }
 
 }(usage));

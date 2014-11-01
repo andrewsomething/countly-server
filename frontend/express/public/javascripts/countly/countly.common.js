@@ -36,6 +36,14 @@
         return _period;
     };
 
+    countlyCommon.getPeriodForAjax = function () {
+        if (Object.prototype.toString.call(_period) === '[object Array]'){
+            return JSON.stringify(_period);
+        } else {
+            return _period;
+        }
+    };
+
     countlyCommon.setActiveApp = function (appId) {
         countlyCommon.ACTIVE_APP_KEY = countlyGlobal['apps'][appId].key;
         countlyCommon.ACTIVE_APP_ID = appId;

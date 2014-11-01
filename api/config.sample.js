@@ -31,6 +31,9 @@ var countlyConfig = {
         country: "TR",
         timezone: "Europe/Istanbul",
         category: "6"
+    },
+    push: {
+        batch: 100
     }
 };
 

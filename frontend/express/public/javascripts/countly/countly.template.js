@@ -112,6 +112,36 @@ $.extend(Template.prototype, {
  */
 (function (CountlyHelpers, $, undefined) {
 
+    CountlyHelpers.parseAndShowMsg = function (msg) {
+        if (!msg || !msg.length) {
+            return true;
+        }
+
+        if (_.isArray(msg)) {
+            msg = msg[0];
+        }
+
+        var type = "info",
+            message = "",
+            msgArr = msg.split("|");
+
+        if (msgArr.length > 1) {
+            type = msgArr[0];
+            message = msgArr[1];
+        } else {
+            message = msg;
+        }
+
+        Messenger().post({
+            message: message,
+            type: type,
+            hideAfter: 10,
+            showCloseButton: true
+        });
+
+        delete countlyGlobal["message"];
+    };
+
     CountlyHelpers.popup = function (elementId, custClass) {
         var dialog = $("#cly-popup").clone();
         dialog.removeAttr("id");
@@ -154,8 +184,9 @@ $.extend(Template.prototype, {
         });
     };
 
-    CountlyHelpers.initializeSelect = function () {
-        $("#content-container").on("click", ".cly-select", function (e) {
+    CountlyHelpers.initializeSelect = function (element) {
+        element = element || $("#content-container");
+        element.off("click", ".cly-select").on("click", ".cly-select", function (e) {
             if ($(this).hasClass("disabled")) {
                 return true;
             }
@@ -208,17 +239,17 @@ $.extend(Template.prototype, {
             e.stopPropagation();
         });
 
-        $("#content-container").on("click", ".select-items .item", function () {
+        element.off("click", ".select-items .item").on("click", ".select-items .item", function () {
             var selectedItem = $(this).parents(".cly-select").find(".text");
             selectedItem.text($(this).text());
             selectedItem.data("value", $(this).data("value"));
         });
 
-        $("#content-container").on("click", ".cly-select .search", function (e) {
+        element.off("click", ".cly-select .search").on("click", ".cly-select .search", function (e) {
             e.stopPropagation();
         });
 
-        $("#content-container").on("keyup", ".cly-select .search input", function(event) {
+        element.off("keyup", ".cly-select .search input").on("keyup", ".cly-select .search input", function(event) {
             if (!$(this).val()) {
                 $(this).parents(".cly-select").find(".item").removeClass("hidden");
             } else {
@@ -233,21 +264,43 @@ $.extend(Template.prototype, {
         });
     };
 
-    function revealDialog(dialog) {
+    CountlyHelpers.revealDialog = revealDialog;
+    CountlyHelpers.changeDialogHeight = changeDialogHeight;
+
+    function revealDialog(dialog, height) {
         $("body").append(dialog);
 
-        var dialogHeight = dialog.height(),
-            dialogWidth = dialog.width();
+        changeDialogHeight(dialog, height);
 
-        dialog.css({
-            "height":dialogHeight,
-            "margin-top":Math.floor(-dialogHeight / 2),
-            "width":dialogWidth,
-            "margin-left":Math.floor(-dialogWidth / 2)
-        });
+        $('#sidebar').resize(changeDialogHeight.bind(this, dialog, undefined, undefined));
 
         $("#overlay").fadeIn();
         dialog.fadeIn();
+    }
+
+    function changeDialogHeight(dialog, height, animate) {
+        var dialogHeight = height || dialog.attr('data-height') || dialog.height() + 15,
+            dialogWidth = dialog.width(),
+            maxHeight = $("#sidebar").height() - 40;
+
+        dialog.attr('data-height', height);
+
+        if (dialogHeight > maxHeight) {
+            dialog[animate ? 'animate' : 'css']({
+                "height":maxHeight,
+                "margin-top":Math.floor(-maxHeight / 2),
+                "width":dialogWidth,
+                "margin-left":Math.floor(-dialogWidth / 2),
+                "overflow-y": "auto",
+            });
+        } else {
+            dialog[animate ? 'animate' : 'css']({
+                "height":dialogHeight,
+                "margin-top":Math.floor(-dialogHeight / 2),
+                "width":dialogWidth,
+                "margin-left":Math.floor(-dialogWidth / 2)
+            });
+        }
     }
 
     $(document).ready(function () {
@@ -1359,6 +1412,72 @@ window.CarrierView = countlyView.extend({
     }
 });
 
+window.LanguageView = countlyView.extend({
+    beforeRender: function() {
+        return $.when(countlyLanguage.initialize()).then(function () {});
+    },
+    renderCommon:function (isRefresh) {
+        var languageData = countlyLanguage.getLanguageData();
+
+        this.templateData = {
+            "page-title":jQuery.i18n.map["languages.title"],
+            "logo-class":"languages",
+            "graph-type-double-pie":true,
+            "pie-titles":{
+                "left":jQuery.i18n.map["common.total-users"],
+                "right":jQuery.i18n.map["common.new-users"]
+            },
+            "chart-data":{
+                "columnCount":4,
+                "columns":[jQuery.i18n.map["languages.table.language"], jQuery.i18n.map["common.table.total-sessions"], jQuery.i18n.map["common.table.total-users"], jQuery.i18n.map["common.table.new-users"]],
+                "rows":[]
+            },
+            "chart-helper":"languages.chart",
+            "table-helper":""
+        };
+
+        languageData.chartData.forEach(function(row){
+            if (row.language in countlyGlobal.languages) row.language = countlyGlobal.languages[row.language].englishName;
+        });
+
+        this.templateData["chart-data"]["rows"] = languageData.chartData;
+
+        if (!isRefresh) {
+            $(this.el).html(this.template(this.templateData));
+
+            $(".sortable").stickyTableHeaders();
+
+            var self = this;
+            $(".sortable").tablesorter({sortList:this.sortList}).bind("sortEnd", function (sorter) {
+                self.sortList = sorter.target.config.sortList;
+            });
+
+            countlyCommon.drawGraph(languageData.chartDPTotal, "#dashboard-graph", "pie");
+            countlyCommon.drawGraph(languageData.chartDPNew, "#dashboard-graph2", "pie");
+        }
+    },
+    refresh:function () {
+        var self = this;
+        $.when(this.beforeRender()).then(function () {
+            if (app.activeView != self) {
+                return false;
+            }
+            self.renderCommon(true);
+            newPage = $("<div>" + self.template(self.templateData) + "</div>");
+            newPage.find(".sortable").tablesorter({sortList:self.sortList});
+
+            $(self.el).find(".sortable tbody").replaceWith(newPage.find(".sortable tbody"));
+
+            var languageData = countlyLanguage.getLanguageData();
+            countlyCommon.drawGraph(languageData.chartDPTotal, "#dashboard-graph", "pie");
+            countlyCommon.drawGraph(languageData.chartDPNew, "#dashboard-graph2", "pie");
+
+            $(".sortable").trigger("update");
+            app.localize();
+        });
+    }
+});
+
 window.ResolutionView = countlyView.extend({
     beforeRender: function() {
         return $.when(countlyDeviceDetails.initialize()).then(function () {});
@@ -1547,6 +1666,18 @@ window.ManageAppsView = countlyView.extend({
                     }
                 }
             }
+
+            countlyGlobal['apps'][appId].apn = countlyGlobal['apps'][appId].apn || {};
+            countlyGlobal['apps'][appId].gcm = countlyGlobal['apps'][appId].gcm || {};
+
+            $("#push-apn-cert-test-view").removeClass('icon-remove').removeClass('icon-ok').addClass(countlyGlobal['apps'][appId].apn.test ? 'icon-ok' : 'icon-remove');
+            $("#push-apn-cert-prod-view").removeClass('icon-remove').removeClass('icon-ok').addClass(countlyGlobal['apps'][appId].apn.prod ? 'icon-ok' : 'icon-remove');
+            $("#view-apn-id").html(countlyGlobal['apps'][appId].apn.id || '<i class="icon-remove"></i>');
+            $("#view-gcm-id").html(countlyGlobal['apps'][appId].gcm.id || '<i class="icon-remove"></i>');
+            $("#view-gcm-key").html(countlyGlobal['apps'][appId].gcm.key || '<i class="icon-remove"></i>');
+            $("#apn-id").val(countlyGlobal['apps'][appId].apn.id || '');
+            $("#gcm-id").val(countlyGlobal['apps'][appId].gcm.id || '');
+            $("#gcm-key").val(countlyGlobal['apps'][appId].gcm.key || '');
         }
 
         function initCountrySelect(parent, countryCode, timezoneText, timezone) {
@@ -1831,7 +1962,33 @@ window.ManageAppsView = countlyView.extend({
                 return false;
             }
 
+            var certTest = $('#apns_cert_test').val().split('.').pop().toLowerCase();
+            if (certTest && $.inArray(certTest, ['p12']) == -1) {
+                CountlyHelpers.alert(jQuery.i18n.map["management-applications.push-error"], "red");
+                return false;
+            }
+
+            var certProd = $('#apns_cert_prod').val().split('.').pop().toLowerCase();
+            if (certProd && $.inArray(certProd, ['p12']) == -1) {
+                CountlyHelpers.alert(jQuery.i18n.map["management-applications.push-error"], "red");
+                return false;
+            }
+
             $(this).addClass("disabled");
+
+            var updatedApp = $(".app-container").filter(function () {
+                    return $(this).data("id") && $(this).data("id") == appId;
+                }),
+                forms = 1 + (ext ? 1 : 0) + (certTest ? 1 : 0) + (certProd ? 1 : 0),
+                reactivateForm = function() {
+                    forms--;
+                    if (forms == 0) {
+                        $("#save-app-edit").removeClass("disabled");
+                        initAppManagement(appId);
+                        hideEdit();
+                        updatedApp.find(".name").text(appName);
+                    }
+                };
 
             $.ajax({
                 type:"GET",
@@ -1842,53 +1999,120 @@ window.ManageAppsView = countlyView.extend({
                         name:appName,
                         category:$("#app-edit-category .cly-select .text").data("value") + '',
                         timezone:$("#app-edit-timezone #app-timezone").val(),
-                        country:$("#app-edit-timezone #app-country").val()
+                        country:$("#app-edit-timezone #app-country").val(),
+                        "apn.id": $("#apn-id").val() || undefined,
+                        "gcm.id": $("#gcm-id").val() || undefined,
+                        "gcm.key": $("#gcm-key").val() || undefined
                     }),
                     api_key:countlyGlobal['member'].api_key
                 },
                 dataType:"jsonp",
                 success:function (data) {
+                    if (data.error) {
+                        CountlyHelpers.alert(jQuery.i18n.map["management-applications.gcm-creds-error"], "red");
+                        forms = 1;
+                        reactivateForm();
+                        return;
+                    }
                     for (var modAttr in data) {
-                        countlyGlobal['apps'][appId][modAttr] = data[modAttr];
-                        countlyGlobal['admin_apps'][appId][modAttr] = data[modAttr];
-                    }
-
-                    if (!ext) {
-                        $("#save-app-edit").removeClass("disabled");
-                        initAppManagement(appId);
-                        hideEdit();
-                        $(".app-container").filter(function () {
-                            return $(this).data("id") && $(this).data("id") == appId;
-                        }).find(".name").text(appName);
-                        return true;
-                    }
-
-                    $('#add-edit-image-form').find("#app_image_id").val(appId);
-                    $('#add-edit-image-form').ajaxSubmit({
-                        resetForm:true,
-                        beforeSubmit:function (formData, jqForm, options) {
-                            formData.push({ name:'_csrf', value:countlyGlobal['csrf_token'] });
-                        },
-                        success:function (file) {
-                            $("#save-app-edit").removeClass("disabled");
-                            var updatedApp = $(".app-container").filter(function () {
-                                return $(this).data("id") && $(this).data("id") == appId;
-                            });
-
-                            if (!file) {
-                                CountlyHelpers.alert(jQuery.i18n.map["management-applications.icon-error"], "red");
-                            } else {
-                                updatedApp.find(".logo").css({
-                                    "background-image":"url(" + file + ")"
-                                });
-                                $("#sidebar-app-select .logo").css("background-image", $("#sidebar-app-select .logo").css("background-image"));
-                            }
-
-                            initAppManagement(appId);
-                            hideEdit();
-                            updatedApp.find(".name").text(appName);
+                        if (modAttr === 'apn.id') {
+                            if (!countlyGlobal['apps'][appId].apn) countlyGlobal['apps'][appId].apn = {};
+                            if (!countlyGlobal['admin_apps'][appId].apn) countlyGlobal['admin_apps'][appId].apn = {};
+                            countlyGlobal['apps'][appId].apn.id = data[modAttr];
+                            countlyGlobal['admin_apps'][appId].apn.id = data[modAttr];
+                        } else if (modAttr === 'gcm.id') {
+                            if (!countlyGlobal['apps'][appId].gcm) countlyGlobal['apps'][appId].gcm = {};
+                            if (!countlyGlobal['admin_apps'][appId].gcm) countlyGlobal['admin_apps'][appId].gcm = {};
+                            countlyGlobal['apps'][appId].gcm.id = data[modAttr];
+                            countlyGlobal['admin_apps'][appId].gcm.id = data[modAttr];
+                        } else if (modAttr === 'gcm.key') {
+                            if (!countlyGlobal['apps'][appId].gcm) countlyGlobal['apps'][appId].gcm = {};
+                            if (!countlyGlobal['admin_apps'][appId].gcm) countlyGlobal['admin_apps'][appId].gcm = {};
+                            countlyGlobal['apps'][appId].gcm.key = data[modAttr];
+                            countlyGlobal['admin_apps'][appId].gcm.key = data[modAttr];
+                        } else {
+                            countlyGlobal['apps'][appId][modAttr] = data[modAttr];
+                            countlyGlobal['admin_apps'][appId][modAttr] = data[modAttr];
                         }
-                    });
+                    }
+
+                    var sidebarLogo = $("#sidebar-app-select .logo").attr("style");
+                    if (sidebarLogo.indexOf(appId) !== -1) {
+                        $("#sidebar-app-select .text").text(appName);
+                    }
+
+                    if (ext) {
+                        $('#add-edit-image-form').find("#app_image_id").val(appId);
+                        $('#add-edit-image-form').ajaxSubmit({
+                            resetForm:true,
+                            beforeSubmit:function (formData, jqForm, options) {
+                                formData.push({ name:'_csrf', value:countlyGlobal['csrf_token'] });
+                            },
+                            success:function (file) {
+                                if (!file) {
+                                    CountlyHelpers.alert(jQuery.i18n.map["management-applications.icon-error"], "red");
+                                } else {
+                                    updatedApp.find(".logo").css({
+                                        "background-image":"url(" + file + "?v" + (new Date().getTime()) + ")"
+                                    });
+
+                                    $("#sidebar-app-select .logo").css("background-image", $("#sidebar-app-select .logo").css("background-image").replace(")","") + "?v" + (new Date().getTime()) + ")");
+                                }
+                                reactivateForm();
+                            }
+                        });
+                    }
+
+
+                    if (certTest) {
+                        $('#add-edit-apn-creds-test-form').find("input[name=app_id]").val(appId);
+                        $('#add-edit-apn-creds-test-form').ajaxSubmit({
+                            resetForm:true,
+                            beforeSubmit:function (formData, jqForm, options) {
+                                formData.push({ name:'_csrf', value:countlyGlobal['csrf_token'] });
+                                formData.push({ name:'api_key', value:countlyGlobal.member.api_key });
+                            },
+                            success:function (resp) {
+                                if (!resp || resp.error) {
+                                    CountlyHelpers.alert(jQuery.i18n.map["management-applications.push-apn-creds-test-error"], "red");
+                                } else {
+                                    if (!countlyGlobal['apps'][appId].apn) {
+                                        countlyGlobal['apps'][appId].apn = {test: resp};
+                                    } else {
+                                        countlyGlobal['apps'][appId].apn.test = resp;
+                                    }
+                                }
+
+                                reactivateForm();
+                            }
+                        });
+                    }
+
+                    if (certProd) {
+                        $('#add-edit-apn-creds-prod-form').find("input[name=app_id]").val(appId);
+                        $('#add-edit-apn-creds-prod-form').ajaxSubmit({
+                            resetForm:true,
+                            beforeSubmit:function (formData, jqForm, options) {
+                                formData.push({ name:'_csrf', value:countlyGlobal['csrf_token'] });
+                                formData.push({ name:'api_key', value:countlyGlobal.member.api_key });
+                            },
+                            success:function (resp) {
+                                if (!resp || resp.error) {
+                                    CountlyHelpers.alert(jQuery.i18n.map["management-applications.push-apn-creds-prod-error"], "red");
+                                } else {
+                                    if (!countlyGlobal['apps'][appId].apn) {
+                                        countlyGlobal['apps'][appId].apn = {prod: resp};
+                                    } else {
+                                        countlyGlobal['apps'][appId].apn.prod = resp;
+                                    }
+                                }
+
+                                reactivateForm();
+                            }
+                        });
+                    }
+
+                    reactivateForm();
                 }
             });
         });
@@ -2492,11 +2716,920 @@ window.EnterpriseView = countlyView.extend({
     }
 });
 
+window.MessagingDashboardView = countlyView.extend({
+    showOnGraph: 3,
+    initialize:function () {
+        this.template = Handlebars.compile($("#template-messaging-dashboard").html());
+    },
+    beforeRender: function() {
+        return $.when(countlySession.initialize(), countlyUser.initialize(), countlyPushEvents.initialize(), countlyPush.initialize()).then(function () {});
+    },
+    renderCommon:function (isRefresh) {
+        var sessionData = countlySession.getSessionData(),
+            messUserDP = countlySession.getMsgUserDPActive(),
+            pushDP = countlyPushEvents.getDashDP(),
+            pushSummary = countlyPushEvents.getDashSummary(),
+            templateData = {};
+
+        templateData["page-title"] = countlyCommon.getDateRange();
+        templateData["logo-class"] = "sessions";
+        templateData["push_short"] = countlyPush.getMessagesForCurrApp();
+
+        templateData["big-numbers"] = pushSummary;
+
+        var secondary = [sessionData.usage['total-users'], sessionData.usage['messaging-users']];
+        secondary[0].title = jQuery.i18n.map["common.total-users"];
+        secondary[0].id = "draw-total-users";
+        secondary[0].help = "dashboard.total-users";
+        secondary[1].title = jQuery.i18n.map["common.messaging-users"];
+        secondary[1].id = "draw-messaging-users";
+        secondary[1].help = "dashboard.messaging-users";
+        templateData["big-numbers-secondary"] = secondary;
+
+        var enabling = 0, sent = 0, delivery = 0, action = 0;
+        if (sessionData.usage['total-users'].total) {
+            enabling = Math.round(100 * (sessionData.usage['messaging-users'].total / sessionData.usage['total-users'].total));
+        }
+        for (var i in pushDP.chartDP[0].data) {
+            sent += pushDP.chartDP[0].data[i][1];
+        }
+        for (var i in pushDP.chartDP[1].data) {
+            delivery += pushDP.chartDP[1].data[i][1];
+        }
+        for (var i in pushDP.chartDP[2].data) {
+            action += pushDP.chartDP[2].data[i][1];
+        }
+        delivery = delivery ? Math.round(100 * delivery / sent) : 0;
+        action = action ? Math.round(100 * action / sent) : 0;
+        templateData["big-numbers-intermediate"] = [
+            { 
+                percentage: enabling + '%', 
+                title: jQuery.i18n.map['push.rate.enabling'], 
+                help: 'dashboard.rate-enabling' },
+            { 
+                percentage: delivery + '%', 
+                title: jQuery.i18n.map['push.rate.delivery'], 
+                help: 'dashboard.rate-delivery' },
+            { 
+                percentage: action + '%', 
+                title: jQuery.i18n.map['push.rate.action'], 
+                help: 'dashboard.rate-action' },
+        ];
+
+        this.templateData = templateData;
+
+        if (!isRefresh) {
+            $(this.el).html(this.template(this.templateData));
+
+            countlyCommon.drawTimeGraph(pushDP.chartDP, "#dashboard-graph");
+            countlyCommon.drawTimeGraph(messUserDP.chartDP, "#dashboard-graph-secondary");
+            $(".sortable").stickyTableHeaders();
+
+            var self = this;
+            $(".sortable").tablesorter({
+                sortList:this.sortList,
+                headers:{
+                    0:{ sorter:'customDate' }
+                }
+            });
+        }
+    },
+    refresh:function () {
+    }
+});
+
+window.MessagingListView = countlyView.extend({
+    template: null,
+    beforeRender: function() {
+        return $.when(countlyPush.initialize()).then(function () {});
+    },
+    initialize:function () {
+        this.template = Handlebars.compile($("#template-messaging-list").html());
+    },
+    renderCommon:function (isRefresh) {
+        var pushes = countlyPush.getAllMessages();
+        $('#content').html(this.template({
+            'logo-class': 'logo',
+            'page-title': 'Messages',
+            pushes:pushes,
+            apps:countlyGlobal['apps']
+        }));
+
+        $('.btn-create-message').off('click').on('click', PushPopup.bind(window, undefined, undefined));
+        $('#push-table tr:not(.push-no-messages)').off('click').on('click', function(){
+            var mid = $(this).attr('data-mid');
+            for (var i in pushes) if (pushes[i]._id === mid) {
+                PushPopup(pushes[i]);
+                return;
+            }
+        });
+    }
+});
+
+var PushPopup = function(message, duplicate) {
+    var allApps = {}, hasPushApps = false, hasPushAdminApps = false, APN = 'i', GCM = 'a',
+        languages = countlyGlobal['languages'],
+        locales;
+
+    for (var id in countlyGlobal['apps']) {
+        var a = countlyGlobal['apps'][id];
+        if ((a.apn && (a.apn.test || a.apn.prod)) || (a.gcm && a.gcm.key)) {
+            hasPushApps = true;
+            if (countlyGlobal['admin_apps'][a._id]) {
+                hasPushAdminApps = true;
+                allApps[a._id] = a;
+            }
+        }
+    }
+
+    if (!hasPushApps) {
+        CountlyHelpers.alert(jQuery.i18n.map["push.no-apps"], "red");
+        return;
+    } else if (!hasPushAdminApps) {
+        CountlyHelpers.alert(jQuery.i18n.map["push.no-apps-admin"], "red");
+        return;
+    }
+
+    if (message) {
+        message = {
+            _id: message._id,
+            duplicate: message,
+            type: message.type,
+            apps: message.apps.slice(0),
+            appNames: [],
+            platforms: message.platforms.slice(0),
+            appsPlatforms: [],
+            messagePerLocale: _.extend({}, message.messagePerLocale),
+            locales: _.extend({}, message.locales),
+            sound:  duplicate ? message.sound : !!message.sound,
+            update: duplicate ? message.update : !!message.update,
+            review: duplicate ? message.review : !!message.review,
+            badge: duplicate ? message.badge : typeof message.badge === 'undefined' ? false : true,
+            data: duplicate ? message.data : typeof message.data === 'undefined' ? false : true,
+            test: message.test,
+            date: message.date,
+            sent: message.sent
+        }
+        for (var i in message.apps) for (var a in allApps) if (allApps[a]._id === message.apps[i]) message.appNames.push(allApps[a].name);
+    } else {
+        message = {
+            type: 'message',
+            apps: [countlyCommon.ACTIVE_APP_ID],
+            appNames: [allApps[countlyCommon.ACTIVE_APP_ID].name],
+            platforms: [],
+            appsPlatforms: [],
+            messagePerLocale: {
+                default: ''
+            },
+            sound: true
+        };
+    }
+
+    var dialog = $("#cly-popup").clone().removeAttr("id").addClass('push-create');
+    dialog.find(".content").html($('#push-create').html());
+
+    var content = dialog.find('.content');
+
+    // View, Create, or Duplicate
+    var isView = message._id && !duplicate;
+    if (isView) {
+        content.find('.create-header').hide();
+    } else {
+        content.find('.view-header').hide();
+    }
+
+    // Apps
+    if (isView) {
+        content.find('.view-apps .view-value').text(message.appNames.join(', '));
+    } else {
+        content.find(".select-apps").on('click', function(ev){
+            if ($('#listof-apps').length) {
+                $('#listof-apps').remove();
+            } else {
+                var pos = $(this).offset();
+                pos.top = pos.top + 46 - content.offset().top;
+                pos.left = pos.left - 18 - content.offset().left;
+                showAppsSelector(pos);
+            }
+        });
+
+        showChangedApps();
+
+        function showAppsSelector(pos) {
+            $('#listof-apps').remove();
+    
+            var listofApps = $('<div id="listof-apps"><div class="tip"></div><div class="scrollable"></div><div class="button-container"><a class="icon-button dark btn-done">' + jQuery.i18n.map["common.done"] + '</a><a class="icon-button dark btn-select-all">' + jQuery.i18n.map["common.select-all"] + '</a><a class="icon-button dark btn-deselect-all">' + jQuery.i18n.map["common.deselect-all"] + '</a></div></div>').hide(),
+                listofAppsScrollable = listofApps.find('.scrollable');
+                ap = function(app){
+                    return $('<div class="app" data-app-id="' + app._id + '"><div class="image" style="background-image: url(\'/files/' + app._id + '.png\');"></div><div class="name">' + app.name + '</div><input class="app_id" type="hidden" value="{{this._id}}"/></div>');
+                };
+
+            for (var id in allApps) {
+                var app = allApps[id], el = ap(app);
+                el.on('click', function(){
+                    var self = $(this),
+                        id = self.attr('data-app-id'),
+                        selected = ! self.hasClass('selected');
+                    if (selected) {
+                        addToArray(id, message.apps);
+                        addToArray(allApps[id].name, message.appNames);
+                    } else {
+                        removeFromArray(id, message.apps);
+                        removeFromArray(allApps[id].name, message.appNames);
+                    }
+                    self.toggleClass('selected');
+                    showChangedApps();
+                })
+                if (message.apps.indexOf(app._id) !== -1) el.addClass('selected');
+                listofAppsScrollable.append(el);
+            };
+
+            listofApps.find('.btn-select-all').on('click', function(ev) {
+                ev.preventDefault();
+
+                message.apps = [];
+                message.appNames = [];
+                for (var i in allApps) {
+                    message.apps.push(allApps[i]._id);
+                    message.appNames.push(allApps[i].name);
+                }
+                showChangedApps();
+                $(this).hide();
+                listofApps.find(".btn-deselect-all").show();
+            });
+
+            listofApps.find('.btn-deselect-all').on('click', function(ev) {
+                ev.preventDefault();
+
+                message.apps = [];
+                message.appNames = [];
+                showChangedApps();
+                $(this).hide();
+                listofApps.find(".btn-select-all").show();
+            });
+
+            listofApps.find('.btn-done').on('click', function (ev) {
+                ev.preventDefault();
+
+                fillAppsPlatforms();
+                showPlatforms();
+
+                listofApps.remove();
+            });
+
+            if (message.apps.length === lengthOfObject(allApps)) {
+                listofApps.find('.btn-select-all').hide();
+                listofApps.find('.btn-deselect-all').show();
+            }
+
+            // return listofApps;
+            // content.find('.app-list-names').text(message.appNames.join(', '));
+            listofApps.appendTo(content).offset(pos).show();
+            // $(body).offset(buttonPos).append(listofApps);
+
+            // listofAppsScrollable.slimScroll({
+            //     height: '100%',
+            //     start: 'top',
+            //     wheelStep: 10,
+            //     position: 'right'
+            // });
+
+        }
+    }
+
+    // Check APN / GCM credentials and set platform buttons accordingly
+    if (isView) {
+        if (!hasInArray(APN, message.platforms)) content.find('.view-platforms .ios').hide();
+        if (!hasInArray(GCM, message.platforms)) content.find('.view-platforms .android').hide();
+    } else {
+        fillAppsPlatforms(duplicate);
+
+        if (!message.platforms.length) {
+            return false;
+        }
+
+        dialog.find('.push-platform').on('click', function (ev){
+            ev.preventDefault();
+
+            var platform = $(this).attr('data-platform');
+
+            if (hasInArray(platform, message.platforms)) {
+                removeFromArray(platform, message.platforms);
+            } else {
+                addToArray(platform, message.platforms);
+            }
+            showPlatforms();
+        });
+
+        showPlatforms();
+    }
+
+    // Set up message type select
+    var heights = {
+        message: 540,
+        update: 540,
+        review: 540,
+        data: 378,
+        link: 613
+    };
+    if (isView) {
+        content.find('.view-type .view-value').text(jQuery.i18n.map['push.type.' + message.type]);
+        // CountlyHelpers.changeDialogHeight(dialog, 470);
+        setTimeout(CountlyHelpers.changeDialogHeight.bind(CountlyHelpers, dialog, 470), 20);
+    } else {
+        CountlyHelpers.initializeSelect(content);
+       
+        content.find(".cly-select .text").on('changeData', function(e){
+            setMessageType($(this).data('value'));
+        });
+
+        var link = content.find('.field.link'),
+            msg = content.find('.field.msg'),
+            sound = content.find('.extra-sound-check').parents('tr'),
+            badge = content.find('.extra-badge-check').parents('tr'),
+            data = content.find('.extra-data-check').parents('tr');
+
+        setTimeout(setMessageType.bind(this, 'message'), 20);
+
+        function setMessageType(type) {
+            message.type = type;
+
+            if (type === 'message' || type === 'update' || type === 'review') {
+                link.slideUp();
+                msg.slideDown();
+                sound.slideDown();
+                badge.slideDown();
+                data.slideDown();
+            } else if (type === 'data') {
+                link.slideUp();
+                msg.slideUp();
+                sound.slideDown();
+                badge.slideDown();
+                data.slideDown();
+            } else if (type === 'link') {
+                link.slideDown();
+                msg.slideDown();
+                sound.slideDown();
+                badge.slideDown();
+                data.slideDown();
+            }
+
+            CountlyHelpers.changeDialogHeight(dialog, heights[type], true);
+        }
+    }
+
+    // Date / send later
+    if (isView) {
+        var fmt = 'MMM DD, YYYY HH:mm';
+        content.find('.view-date .view-value').text(message.date ? moment(message.date).format(fmt) : '');
+        content.find('.view-sent .view-value').text(message.sent ? moment(message.sent).format(fmt) : '');
+    } else {
+        content.find(".send-later-datepicker").datepicker({
+            numberOfMonths:1,
+            showOtherMonths:true,
+            minDate:new Date(),
+            onSelect:function (selectedDate) {
+                var instance = $(this).data("datepicker"),
+                    date = $.datepicker.parseDate(instance.settings.dateFormat || $.datepicker._defaults.dateFormat, selectedDate, instance.settings);
+
+                if (moment(date).format("DD-MM-YYYY") == moment().format("DD-MM-YYYY")) {
+                    initTimePicker(true);
+                } else {
+                    initTimePicker();
+                }
+            }
+        });
+
+        content.find(".send-later-datepicker").datepicker("option", $.datepicker.regional[countlyCommon.BROWSER_LANG]);
+
+        initTimePicker(true);
+
+        var hidePicker = function(){
+            $(document.body).off('click', hidePicker);
+            content.find(".date-picker-push").hide();
+        };
+
+        // content.find(".send-later").next('label').on("click", content.find(".send-later").trigger.bind(content.find(".send-later"), "click"));
+        content.find(".send-later").on("click", function (e) {
+            if ($(this).is(":checked")) {
+                content.find(".date-picker-push").show();
+                setTimeText();
+                $(document.body).off('click', hidePicker).on('click', hidePicker);
+            } else {
+                content.find(".date-picker-push").hide();
+                content.find(".send-later-date").text("");
+            }
+
+            e.stopPropagation();
+        });
+
+        content.find(".send-later-date").on('click', function(e){
+            e.stopPropagation();
+
+            $(document.body).off('click', hidePicker);
+
+            if (content.find(".date-picker-push").is(':visible')) {
+                content.find(".date-picker-push").hide();
+            } else {
+                content.find(".date-picker-push").show();
+                $(document.body).on('click', hidePicker);
+            }
+        });
+
+        function setTimeText() {
+            var laterText = moment(content.find(".send-later-datepicker").datepicker("getDate")).format("DD.MM.YYYY");
+            laterText += ", " + content.find(".time-picker-push").find("span.active").text();
+
+            content.find(".send-later-date").text(laterText);
+            content.find(".send-later-date").data("timestamp", moment(laterText, "DD.MM.YYYY, H:mm").unix());
+        }
+
+        function initTimePicker(isToday) {
+            var timeSelected = false;
+            content.find(".time-picker-push").html("");
+
+            if (isToday) {
+                var currHour = parseInt(moment().format("H"), 10),
+                    currMin = parseInt(moment().format("m"), 10),
+                    timePickerStartHour = moment().format("H");
+
+                if (currMin < 30) {
+                    content.find(".time-picker-push").append('<span class="active">' + timePickerStartHour + ':30</span>');
+                    timeSelected = true;
+                }
+
+                timePickerStartHour = currHour + 1;
+            } else {
+                timePickerStartHour = 0;
+            }
+
+            for (; timePickerStartHour <= 23; timePickerStartHour++) {
+                if (timeSelected) {
+                    content.find(".time-picker-push").append('<span>' + timePickerStartHour + ':00</span>');
+                } else {
+                    content.find(".time-picker-push").append('<span class="active">' + timePickerStartHour + ':00</span>');
+                    timeSelected = true;
+                }
+
+                content.find(".time-picker-push").append('<span>' + timePickerStartHour + ':30</span>');
+            }
+        }
+
+        content.find(".time-picker-push").on("click", "span", function() {
+            content.find(".time-picker-push").find("span").removeClass("active");
+            $(this).addClass("active");
+            setTimeText();
+        });
+    }
+
+    // Locales / message
+    {
+        message.usedLocales = {};
+        var ul = content.find('.locales ul'),
+            txt = content.find('.msg textarea'),
+            li = function(percentage, locale, title){
+                var el = $('<li data-locale="' + locale + '"><span class="percentage">' + percentage + '%</span><span class="locale">' + title + '</span><span class="icon-ok"></span>' + (locale === 'default' ? '' :  ' <span class="icon-remove"></span>') + '</li>')
+                        .on('click', function(){
+                            var selected = ul.find('.selected').attr('data-locale');
+                            message.messagePerLocale[selected] = txt.val();
+                            
+                            setMessagePerLocale(locale);
+                        })
+                        .on('click', '.icon-remove', function(ev){
+                            ev.stopPropagation();
+
+                            txt.val('');
+                            delete message.messagePerLocale[locale];
+                            
+                            setUsedLocales();
+                        });
+                return el;
+            };
+
+        if (isView) {
+            message.usedLocales = _.extend({}, message.locales);
+            fillLocales();
+        } else {
+            txt.on('blur', setUsedLocales);
+            // wait for device count download
+
+            // message.apps.forEach(function(appId){
+            //     var app = allApps[appId];
+
+            //     if (appId in locales) for (var locale in locales[appId]) {
+            //         if (!(locale in message.usedLocales)) message.usedLocales[locale] = 0;
+            //         message.usedLocales[locale] += locales[appId][locale];
+            //     }
+            // });
+            // for (var locale in message.usedLocales) message.usedLocales[locale] /= message.apps.length;
+        }
+
+        function fillLocales() {
+            ul.empty();
+            if ('default' in message.usedLocales) {
+                ul.append(li(Math.round(100 * message.usedLocales.default), 'default', jQuery.i18n.map["push.locale.default"]).addClass('selected'));
+            }
+            for (var locale in message.usedLocales) if (locale !== 'default') {
+                ul.append(li(Math.round(100 * message.usedLocales[locale]), locale, (languages[locale] || '').englishName));
+            }
+
+            var def;
+            if ('default' in message.usedLocales) def = 'default';
+            else for (var k in message.usedLocales) { def = k; break; }
+            setMessagePerLocale(def);
+        }
+
+        function setMessagePerLocale(selected) {
+            ul.find('li').each(function(){
+                var li = $(this), locale = li.attr('data-locale');
+
+                if (message.messagePerLocale[locale]) {
+                    li.addClass('set');
+                } else {
+                    li.removeClass('set');
+                }
+
+                if (selected === locale) {
+                    li.addClass('selected');
+                } else {
+                    li.removeClass('selected');
+                }
+
+            });
+            txt.val(message.messagePerLocale[selected] || '');
+        }
+
+    }
+
+    if (isView) {
+        content.find('textarea').prop('disabled', true);
+        content.find('.locales').addClass('view-locales');
+    }
+
+    // Extras
+    if (isView || duplicate) {
+        if (message.test) content.find('.extra-test-check').attr('checked', 'checked');
+        if (message.sound) {
+            content.find('.extras .extra-sound-check').attr('checked', 'checked');
+            content.find('.extras .extra-sound').val(message.sound);
+        }
+        if (message.badge) {
+            content.find('.extras .extra-badge-check').attr('checked', 'checked');
+            content.find('.extras .extra-badge').val(message.badge);
+        }
+        if (message.data) {
+            content.find('.extras .extra-data-check').attr('checked', 'checked');
+            content.find('.extras .extra-data').val(JSON.stringify(message.data));
+        }
+    }
+
+    if (isView) {
+        content.find('.extras input, .extra-test-check').prop('disabled', true);
+    } else {
+        content.find('.extras table input[type="checkbox"], .extra-test-check').on('change', function(ev){
+            message[$(this).attr('data-attr')] = $(this).is(':checked');
+            showExtras();
+
+            $(this).parents('td').next('td').find('input').focus();
+            if ($(this).attr('data-attr') === 'test') {
+                setDeviceCount();
+            }
+        });
+        content.find('.extras table td.td-value').on('click', function(ev){
+            if ($(this).find('input[type="text"]').prop('disabled')) {
+                $(this).prev().find('input[type="checkbox"]').trigger('click');
+            }
+        });
+        content.find('.extras table label, .test-switch-holder label').on('click', function(ev){
+            var box = $(this).prev();
+            if (box.is(':checkbox')) {
+                box.trigger('click');
+            }
+        });
+
+        var sound = content.find('.extras .extra-sound'),
+            badge = content.find('.extras .extra-badge'),
+            data = content.find('.extras .extra-data');
+        function showExtras(){
+            if (message.sound) sound.prop('disabled', false);
+            else sound.prop('disabled', true);
+
+            if (message.badge) badge.prop('disabled', false);
+            else badge.prop('disabled', true);
+
+            if (message.data) data.prop('disabled', false);
+            else data.prop('disabled', true);
+        }
+
+        content.find('.extra-data').on('blur', function(){
+            $(this).next('.required').remove();
+
+            var str = $(this).val(), json = toJSON(str);
+            if (json) $(this).val(JSON.stringify(json));
+            else if (str) {
+                $(this).after($("<span>").addClass("required").text("*").show());
+            }
+        });
+    }
+
+    // Buttons
+    if (isView) {
+        content.find('.btn-send').hide();
+        content.find('.btn-duplicate').on('click', function(){
+            $("#overlay").trigger('click');
+            setTimeout(PushPopup.bind(window, message.duplicate, true), 500);
+        });
+        content.find('.btn-delete').on('click', function(){
+            var butt = $(this).addClass('disabled');
+            countlyPush.deleteMessage(message._id, function(msg){
+                butt.removeClass('disabled');
+                app.activeView.render();
+                content.find('.btn-close').trigger('click');
+            }, function(error){
+                content.find('.btn-close').trigger('click');
+            });
+        });
+    } else {
+        content.find('.btn-duplicate').hide();
+        content.find('.btn-delete').hide();
+        content.find('.btn-send').on('click', function(){
+            if ($(this).hasClass('disabled')) return;
+
+            var json = messageJSON();
+
+            $(".required").fadeOut().remove();
+            var req = $("<span>").addClass("required").text("*");
+
+            if (!json.apps.length) {
+                content.find(".field.apps .app-names").append(req.clone());
+            } 
+            if (!json.platforms.length) {
+                content.find(".field.platforms .details").append(req.clone());
+            } 
+            if (message.sound && !json.sound) {
+                content.find(".extra-sound").after(req.clone());
+            } 
+            if (message.badge && (!json.badge || !isNumber(json.badge))) {
+                content.find(".extra-badge").after(req.clone());
+            } 
+            if (message.data && (!json.data || !toJSON(json.data))) {
+                content.find(".extra-data").after(req.clone());
+            } 
+            if ('default' in message.usedLocales && !json.messagePerLocale.default) {
+                content.find(".locales li").first().append(req.clone());
+            }
+
+            if (!$('.required').show().length) {
+                var butt = $(this).addClass('disabled');
+                countlyPush.createMessage(json, null, function(msg){
+                    butt.removeClass('disabled');
+                    app.activeView.render();
+                    // Messenger({
+                    //     extraClasses: 'messenger-fixed messenger-on-top messenger-on-right'
+                    // }).post({
+                    //     message: jQuery.i18n.map["management-pushes.sending-message.desc"],
+                    //     type: 'success',
+                    //     hideAfter: 10,
+                    //     showCloseButton: true
+                    // });
+                    content.find('.btn-close').trigger('click');
+                }, function(error){
+                    content.find('.btn-close').trigger('click');
+                    // butt.removeClass('disabled');
+                    // Messenger({
+                    //     extraClasses: 'messenger-fixed messenger-on-top messenger-on-right'
+                    // }).post({
+                    //     message: error || jQuery.i18n.map["management-pushes.error"],
+                    //     type: 'error',
+                    //     hideAfter: 10,
+                    //     showCloseButton: true
+                    // });
+                });
+            }
+        });
+    }
+
+    content.find('.btn-close').on('click', function(){
+        $("#overlay").trigger('click');
+    });
+
+    // Device count
+    {
+        var count, send;
+
+        setDeviceCount();
+
+        function setUsedLocales() {
+            var txt = content.find('.msg textarea'),
+                selected = content.find('.locales ul li.selected').attr('data-locale');
+            
+            if (selected) message.messagePerLocale[selected] = txt.val();
+
+            message.usedLocales = {};
+            for (var l in message.count) if (typeof message.count[l] !== 'object') {
+                if (l in languages && message.count[l]) {
+                    message.usedLocales[l] = message.count[l];
+                }
+            }
+            var all = 0;
+            for (var l in message.messagePerLocale) {
+                if (message.messagePerLocale[l] && l !== 'default') all += message.usedLocales[l];
+            }
+            
+            if (message.messagePerLocale.default) {
+                message.usedLocales.default = message.count.TOTALLY - all;
+            } else if (all < message.count.TOTALLY) {
+                message.usedLocales.default = message.count.TOTALLY - all;
+            }
+
+            if (message.count.TOTALLY) {
+                txt.show();
+                for (var l in message.usedLocales) {
+                    message.usedLocales[l] = message.usedLocales[l] / message.count.TOTALLY;
+                }
+            } else {
+                txt.hide();
+            }
+
+            if (!message.count.TOTALLY || ('default' in message.usedLocales && !message.messagePerLocale.default)) {
+                send.addClass('disabled');
+            } else {
+                send.removeClass('disabled');
+            }
+
+            fillLocales();
+
+            if (selected) content.find('.locales ul li[data-locale="' + selected + '"]').trigger('click');
+        }
+
+        function setDeviceCount(){
+            if (!count) {
+                count = content.find('.count-value');
+                send = content.find('.btn-send');
+            }
+            count.text('');
+            countlyPush.getAudience(
+                {apps: message.apps, platforms: message.platforms, test: message.test},
+                function(resp) {
+                    message.count = resp;
+                    
+                    setUsedLocales();
+                    
+                    var span = '<span class="green">&nbsp;' + jQuery.i18n.prop('push.count', resp.TOTALLY) + '&nbsp;</span';
+                    count.empty().append(jQuery.i18n.map['push.start']).append(span).append(jQuery.i18n.map['push.end']);
+                },
+                function(err){
+
+                }
+            );
+        }
+    }
+
+    if (isView) {
+        content.find('input, textarea').each(function(){
+            $(this).removeAttr('placeholder');
+        });
+    }
+
+    // Platforms stuff
+    function showPlatforms() {
+        var ios = content.find('.push-platform.ios'), and = content.find('.push-platform.android');
+
+        if (hasInArray(APN, message.appsPlatforms)) {
+            ios.show();
+            if (hasInArray(APN, message.platforms)) {
+                ios.addClass('active');
+            } else {
+                ios.removeClass('active');
+            }
+        } else {
+            ios.hide();
+        }
+
+        if (hasInArray(GCM, message.appsPlatforms)) {
+            and.show();
+            if (hasInArray(GCM, message.platforms)) {
+                and.addClass('active');
+            } else {
+                and.removeClass('active');
+            }
+        } else {
+            and.hide();
+        }
+
+        setDeviceCount();
+    }
+
+    function showChangedApps() {
+        if (message.apps.length) {
+            content.find(".no-apps").hide();
+            content.find(".app-names").text(message.appNames.join(", ")).show();
+        } else {
+            content.find(".no-apps").show();
+            content.find(".app-names").hide();
+        }
+        content.find('#listof-apps .app').each(function(){
+            if (hasInArray($(this).attr('data-app-id'), message.apps)) {
+                $(this).addClass('selected');
+            } else {
+                $(this).removeClass('selected');
+            }
+        });
+    }
+
+    function lengthOfObject(obj) {
+        var l = 0;
+        for (var i in obj) l++;
+        return l;
+    }
+
+    function hasInArray(item, array) {
+        return array.indexOf(item) !== -1;
+    }
+
+    function removeFromArray(item, array) {
+        var index = array.indexOf(item);
+        if (index !== -1) array.splice(index, 1);
+    }
+
+    function addToArray(item, array) {
+        removeFromArray(item, array)
+        array.push(item);
+    }
+
+    function isNumber(n) {
+        return !isNaN(parseFloat(n)) && isFinite(n);
+    }
+
+    function toJSON(str) {
+        try {
+            var o = jsonlite.parse(str);
+            return typeof o === 'object' ? o : false;
+        } catch(e){
+            return false;
+        }
+    }
+
+    function fillAppsPlatforms(skipPlatforms) {
+        if (!skipPlatforms) message.platforms = [];
+        message.appsPlatforms = [];
+
+        message.apps.forEach(function(appId){
+            var app = allApps[appId];
+            if (app.apn && (app.apn.test || app.apn.prod)) {
+                if (!skipPlatforms) addToArray(APN, message.platforms);
+                addToArray(APN, message.appsPlatforms);
+            }
+            if (app.gcm && app.gcm.key) {
+                if (!skipPlatforms) addToArray(GCM, message.platforms);
+                addToArray(GCM, message.appsPlatforms);
+            }
+        });
+    }
+
+    function messageJSON() {
+        var txt = content.find('.msg textarea'),
+            selected = content.find('.locales ul li.selected').attr('data-locale');
+        
+        message.messagePerLocale[selected] = txt.val();
+
+        var json = {
+            type: message.type,
+            apps: message.apps.slice(0),
+            appNames: message.appNames.slice(0),
+            platforms: message.platforms.slice(0),
+            messagePerLocale: {},
+            test: message.test,
+            sound: message.sound ? content.find('.extra-sound').val() : '',
+            badge: message.badge ? content.find('.extra-badge').val() : '',
+            data:  message.data  ? content.find('.extra-data').val()  : '',
+            update: message.type === 'update',
+            review: message.type === 'review',
+            locales: message.usedLocales,
+            date: content.find('.send-later:checked').length ? content.find('.send-later-date').data('timestamp') : null
+        };
+
+        if (json.sound === '') delete json.sound;
+        if (json.badge === '') delete json.badge;
+        if (json.data  === '') delete json.data;
+        if (!json.update) delete json.update;
+        if (!json.review) delete json.review;
+
+        for (var l in message.messagePerLocale) if (message.messagePerLocale[l]) {
+            json.messagePerLocale[l] = message.messagePerLocale[l];
+        }
+        return json;
+    }
+
+    CountlyHelpers.revealDialog(dialog, heights[message.type]);
+};
+
 var AppRouter = Backbone.Router.extend({
     routes:{
         "/":"dashboard",
         "/analytics/sessions":"sessions",
         "/analytics/countries":"countries",
+        "/analytics/languages":"languages",
         "/analytics/users":"users",
         "/analytics/loyalty":"loyalty",
         "/analytics/devices":"devices",
@@ -2511,6 +3644,8 @@ var AppRouter = Backbone.Router.extend({
         "/manage/apps":"manageApps",
         "/manage/users":"manageUsers",
         "/enterprise": "enterprise",
+        "/messaging":"messagingDashboardView",
+        "/messaging/messages":"messagingListView",
         "*path":"main"
     },
     activeView:null, //current view
@@ -2529,6 +3664,9 @@ var AppRouter = Backbone.Router.extend({
     },
     countries:function () {
         this.renderWhenReady(this.countriesView);
+    },
+    languages:function () {
+        this.renderWhenReady(this.languagesView);
     },
     devices:function () {
         this.renderWhenReady(this.deviceView);
@@ -2572,6 +3710,12 @@ var AppRouter = Backbone.Router.extend({
     enterprise:function () {
         this.renderWhenReady(this.enterpriseView);
     },
+    messagingDashboardView:function () {
+        this.renderWhenReady(this.messagingDashboardView);
+    },
+    messagingListView:function () {
+        this.renderWhenReady(this.messagingListView);
+    },
     refreshActiveView:function () {
     }, //refresh interval function
     renderWhenReady:function (viewName) { //all view renders end up here
@@ -2605,6 +3749,7 @@ var AppRouter = Backbone.Router.extend({
         this.dashboardView = new DashboardView();
         this.sessionView = new SessionView();
         this.countriesView = new CountriesView();
+        this.languagesView = new LanguageView();
         this.userView = new UserView();
         this.loyaltyView = new LoyaltyView();
         this.deviceView = new DeviceView();
@@ -2619,6 +3764,8 @@ var AppRouter = Backbone.Router.extend({
         this.densityView = new DensityView();
         this.durationsView = new DurationView();
         this.enterpriseView = new EnterpriseView();
+        this.messagingDashboardView = new MessagingDashboardView();
+        this.messagingListView = new MessagingListView();
 
         Handlebars.registerPartial("date-selector", $("#template-date-selector").html());
         Handlebars.registerPartial("timezones", $("#template-timezones").html());
@@ -2655,6 +3802,9 @@ var AppRouter = Backbone.Router.extend({
             ret = parseFloat((parseFloat(context).toFixed(2)).toString()).toString();
             return ret.replace(/(\d)(?=(\d\d\d)+(?!\d))/g, "$1,");
         });
+        Handlebars.registerHelper('languageTitle', function (context, options) {
+            return countlyGlobal.languages[context];
+        });
         Handlebars.registerHelper('toUpperCase', function (context, options) {
             return context.toUpperCase();
         });
@@ -2662,11 +3812,13 @@ var AppRouter = Backbone.Router.extend({
             var ret = "";
 
             for (var i = 0; i < context.length; i++) {
-                if (!countlyGlobal['apps'][context[i]]) {
+                if (!context[i]) {
                     continue;
+                } else if (!countlyGlobal['apps'][context[i]]) {
+                    ret += 'deleted app';
+                } else {
+                    ret += countlyGlobal['apps'][context[i]]["name"];
                 }
-
-                ret += countlyGlobal['apps'][context[i]]["name"];
 
                 if (context.length > 1 && i != context.length - 1) {
                     ret += ", ";
@@ -2687,6 +3839,29 @@ var AppRouter = Backbone.Router.extend({
             var context = $.extend({}, this, options.hash);
             return partial(context);
         });
+
+        Handlebars.registerPartial("message", $("#template-message-partial").html());
+        Handlebars.registerHelper('eachPushableOfApps', function (context, options) {
+            var ret = "";
+            for (var prop in context) {
+                var app = context[prop];
+                if ((app.apn && (app.apn.test || app.apn.prod)) || (app.gcm.id && app.gcm.key)) ret = ret + options.fn(context[prop]);
+            }
+            return ret;
+        });
+
+        Handlebars.registerHelper('ifMessageStatusToRetry', function (status, options) {
+            return status == MessageStatus.Error ? options.fn(this) : '';
+        });
+        Handlebars.registerHelper('ifMessageStatusToStop', function (status, options) {
+            return status == MessageStatus.InProcessing || status == MessageStatus.InQueue ? options.fn(this) : '';
+        });
+
+        Messenger.options = {
+            extraClasses: 'messenger-fixed messenger-on-top',
+            theme: 'future',
+            parentLocations: ['#content-container']
+        };
 
         $.tablesorter.addParser({
             id:'customDate',
@@ -2712,7 +3887,7 @@ var AppRouter = Backbone.Router.extend({
         });
 
         jQuery.i18n.properties({
-            name:'help',
+            name:['help', 'help-push'],
             cache:true,
             language:countlyCommon.BROWSER_LANG_SHORT,
             path:'/localization/help/',
@@ -2722,7 +3897,7 @@ var AppRouter = Backbone.Router.extend({
                 jQuery.i18n.map = {};
 
                 jQuery.i18n.properties({
-                    name:'dashboard',
+                    name:['dashboard', 'dashboard-push'],
                     cache:true,
                     language:countlyCommon.BROWSER_LANG_SHORT,
                     path:'/localization/dashboard/',
@@ -3127,7 +4302,7 @@ var AppRouter = Backbone.Router.extend({
                 localizedValue = jQuery.i18n.map[elem.data("localize")];
             }
 
-            if (elem.is("input[type=text]") || elem.is("input[type=password]")) {
+            if (elem.is("input[type=text]") || elem.is("input[type=password]") || elem.is("textarea")) {
                 elem.attr("placeholder", localizedValue);
             } else if (elem.is("input[type=button]") || elem.is("input[type=submit]")) {
                 elem.attr("value", localizedValue);

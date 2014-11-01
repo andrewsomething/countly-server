@@ -1,5 +1,6 @@
 var appsApi = {},
     common = require('./../../utils/common.js'),
+    push = require('./../pushly/endpoints.js'),
     fs = require('fs');
 
 (function (appsApi) {
@@ -69,7 +70,10 @@ var appsApi = {},
                 'name':     { 'required': true, 'type': 'String' },
                 'country':  { 'required': false, 'type': 'String' },
                 'category': { 'required': false, 'type': 'String' },
-                'timezone': { 'required': false, 'type': 'String' }
+                'timezone': { 'required': false, 'type': 'String' },
+                'apn_id':  { 'required': false, 'type': 'String', 'min-length': 5, 'max-length': 10 },
+                'gcm_id':  { 'required': false, 'type': 'String', 'min-length': 12, 'max-length': 12 },
+                'gcm_key':      { 'required': false, 'type': 'String', 'min-length': 32, 'max-length': 40 }
             },
             newApp = {};
 
@@ -98,12 +102,15 @@ var appsApi = {},
                 'name':     { 'required': false, 'type': 'String' },
                 'category': { 'required': false, 'type': 'String' },
                 'timezone': { 'required': false, 'type': 'String' },
-                'country':  { 'required': false, 'type': 'String' }
+                'country':  { 'required': false, 'type': 'String' },
+                'apn.id':  { 'required': false, 'type': 'String'/*, 'min-length': 5, 'max-length': 10 */ },
+                'gcm.id':  { 'required': false, 'type': 'String'/*, 'min-length': 12, 'max-length': 12 */ },
+                'gcm.key':      { 'required': false, 'type': 'String'/*, 'min-length': 32, 'max-length': 40 */ }
             },
-            updatedApp = {};
+            updatedApp = {}, $set = {}, $unset = {};
 
         if (!(updatedApp = common.validateArgs(params.qstring.args, argProps))) {
-            common.returnMessage(params, 400, 'Not enough args');
+            common.returnOutput(params, {error: 'Invalid arguments provided'});
             return false;
         }
 
@@ -112,26 +119,60 @@ var appsApi = {},
             return true;
         }
 
+        if (!updatedApp['apn.id']) {
+            $unset['apn.id'] = true;
+        }
+
+        if (!updatedApp['gcm.id']) {
+            $unset['gcm.id'] = true;
+        }
+
+        if (!updatedApp['gcm.key']) {
+            $unset['gcm.key'] = true;
+        }
+
         processAppProps(updatedApp);
 
-        if (params.member && params.member.global_admin) {
-            common.db.collection('apps').update({'_id': common.db.ObjectID(params.qstring.args.app_id)}, {$set: updatedApp}, function(err, app) {
-                common.returnOutput(params, updatedApp);
-            });
-        } else {
-            common.db.collection('members').findOne({'_id': params.member._id}, {admin_of: 1}, function(err, member){
-                if (member.admin_of && member.admin_of.indexOf(params.qstring.args.app_id) !== -1) {
-                    common.db.collection('apps').update({'_id': common.db.ObjectID(params.qstring.args.app_id)}, {$set: updatedApp}, function(err, app) {
-                        common.returnOutput(params, updatedApp);
+        var update = {$set: updatedApp};
+        for (var k in $unset) update.$unset = $unset;
+
+        common.db.collection('apps').findOne(common.db.ObjectID(params.qstring.args.app_id), function(err, app){
+            if (err || !app) common.returnMessage(params, 404, 'App not found');
+            else {
+                var needToCheckGCM = updatedApp['gcm.key'] && (!app.gcm || !app.gcm.key || app.gcm.key != updatedApp['gcm.key']);
+
+                if (params.member && params.member.global_admin) {
+                    common.db.collection('apps').findAndModify({_id: common.db.ObjectID(params.qstring.args.app_id)}, [['_id', 1]], update, {new:true}, function(err, app){
+                        if (needToCheckGCM) checkGCM(params, app);
+                        else common.returnOutput(params, app);
                     });
                 } else {
-                    common.returnMessage(params, 401, 'User does not have admin rights for this app');
+                    common.db.collection('members').findOne({'_id': params.member._id}, {admin_of: 1}, function(err, member){
+                        if (member.admin_of && member.admin_of.indexOf(params.qstring.args.app_id) !== -1) {
+                            common.db.collection('apps').findAndModify({_id: common.db.ObjectID(params.qstring.args.app_id)}, [['_id', 1]], update, {new:true}, function(err, app){
+                                if (needToCheckGCM) checkGCM(params, app);
+                                else common.returnOutput(params, app);
+                            });
+                        } else {
+                            common.returnMessage(params, 401, 'User does not have admin rights for this app');
+                        }
+                    });
                 }
-            });
-        }
+            }
+        });
 
         return true;
     };
+
+    function checkGCM(params, app) {
+        push.check('' + app._id, 'a', false, function(ok){
+            if (!ok) {
+                common.returnOutput(params, {error: 'Invalid GCM key'});
+            } else {
+                common.returnOutput(params, app);
+            }
+        });
+    }
 
     appsApi.deleteApp = function (params) {
         if (!(params.member.global_admin)) {
@@ -207,6 +248,8 @@ var appsApi = {},
         common.db.collection('devices').remove({'_id': common.db.ObjectID(appId)});
         common.db.collection('device_details').remove({'_id': common.db.ObjectID(appId)});
         common.db.collection('app_versions').remove({'_id': common.db.ObjectID(appId)});
+        common.db.collection('langs').remove({'_id': common.db.ObjectID(appId)});
+        common.db.collection('messages').remove({'apps': [common.db.ObjectID(appId)]});
 
         common.db.collection('events').findOne({'_id': common.db.ObjectID(appId)}, function(err, events) {
             if (!err && events && events.list) {

@@ -12,6 +12,10 @@ countlyCommon.API_PARTS = {
     users:{
         "w":countlyCommon.API_URL + "/i/users",
         "r":countlyCommon.API_URL + "/o/users"
+    },
+    pushes:{
+        "w":countlyCommon.API_URL + "/i/pushes",
+        "r":countlyCommon.API_URL + "/o/pushes"
     }
 };
 countlyCommon.DASHBOARD_REFRESH_MS = 10000;

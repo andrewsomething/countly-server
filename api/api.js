@@ -3,6 +3,8 @@ var http = require('http'),
     os = require('os'),
     url = require('url'),
     common = require('./utils/common.js'),
+    pushly = require('pushly')(),
+    scheduler = require('./parts/pushly/scheduler.js'),
     countlyApi = {
         data:{
             usage:require('./parts/data/usage.js'),
@@ -12,7 +14,8 @@ var http = require('http'),
         mgmt:{
             users:require('./parts/mgmt/users.js'),
             apps:require('./parts/mgmt/apps.js')
-        }
+        },
+        push:require('./parts/pushly/endpoints.js')
     };
 
 http.globalAgent.maxSockets = common.config.api.max_sockets || 1024;
@@ -39,6 +42,22 @@ function validateAppForWriteAPI(params) {
         common.db.collection('sessions').update({'_id':params.app_id}, {'$inc':updateSessions}, {'upsert':true}, function(err, res){});
 
         if (params.qstring.events) {
+            for (var i = 0; i < params.qstring.events.length; i++) {
+                var event = params.qstring.events[i];
+
+                if (event.key && event.key.indexOf('[CLY]_push') == 0 && event.segmentation && event.segmentation.i && event.segmentation.i.length == 24) {
+                    var $inc = {};
+
+                    if (event.key == '[CLY]_push_open') {
+                        $inc['result.delivered'] = event.count;
+                    } else if (event.key == '[CLY]_push_action') {
+                        $inc['result.actioned'] = event.count;
+                    }
+
+                    common.db.collection('messages').update({_id: common.db.ObjectID(event.segmentation.i)}, {$inc: $inc});
+                }
+            }
+
             countlyApi.data.events.processEvents(params);
         } else if (common.config.api.safe) {
             common.returnMessage(params, 200, 'Success');
@@ -46,6 +65,12 @@ function validateAppForWriteAPI(params) {
 
         if (params.qstring.begin_session) {
             countlyApi.data.usage.beginUserSession(params);
+        } else if (params.qstring.token_session) {
+            common.db.collection('app_users' + params.app_id).findOne({'_id': params.app_user_id }, function (err, dbAppUser){
+                if (dbAppUser) {
+                    countlyApi.push.processTokenSession(dbAppUser, params);
+                }
+            });
         } else if (params.qstring.end_session) {
             if (params.qstring.session_duration) {
                 countlyApi.data.usage.processSessionDuration(params, function () {
@@ -135,6 +160,8 @@ if (cluster.isMaster) {
     cluster.on('exit', function(worker) {
         cluster.fork();
     });
+
+    scheduler();
 
 } else {
 
@@ -418,6 +445,7 @@ if (cluster.isMaster) {
                     case 'devices':
                     case 'device_details':
                     case 'carriers':
+                    case 'langs':
                     case 'app_versions':
                         validateUserForDataReadAPI(params, countlyApi.data.fetch.fetchTimeData, params.qstring.method);
                         break;
@@ -477,6 +505,59 @@ if (cluster.isMaster) {
                         break;
                 }
 
+                break;
+            }
+        }
+
+        switch (apiPath) {
+            case '/i/pushes': {
+                if (params.qstring.args) {
+                    try {
+                        params.qstring.args = JSON.parse(params.qstring.args);
+                    } catch (SyntaxError) {
+                        console.log('Parse /i/pushes JSON failed');
+                    }
+                }
+
+                switch (paths[3]) {
+                    case 'audience':
+                        validateUserForWriteAPI(countlyApi.push.getAudience, params);
+                        break;
+                    case 'create':
+                        validateUserForWriteAPI(countlyApi.push.createMessage, params);
+                        break;
+                    case 'retry':
+                        validateUserForWriteAPI(countlyApi.push.retryMessage, params);
+                        break;
+                    case 'refresh':
+                        validateUserForWriteAPI(countlyApi.push.refreshMessage, params);
+                        break;
+                    case 'delete':
+                        validateUserForWriteAPI(countlyApi.push.deleteMessage, params);
+                        break;
+                    case 'check':
+                        validateUserForWriteAPI(countlyApi.push.checkApp, params);
+                        break;
+                    default:
+                        common.returnMessage(params, 404, 'Invalid endpoint');
+                        break;
+                }
+
+                break;
+            }
+            case '/o/pushes': {
+                if (params.qstring.args) {
+                    try {
+                        params.qstring.args = JSON.parse(params.qstring.args);
+                    } catch (SyntaxError) {
+                        console.log('Parse /i/pushes JSON failed');
+                    }
+                }
+                validateUserForWriteAPI(countlyApi.push.getAllMessages, params);
+                break;
+            }
+            case '/o/errors': {
+                common.returnOutput(params, []);
                 break;
             }
         }

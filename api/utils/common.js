@@ -17,7 +17,8 @@ var common = {},
         'frequency': 'f',
         'loyalty': 'l',
         'sum': 's',
-        'count': 'c'
+        'count': 'c',
+        'messaging-enabled': 'm'
     };
 
     common.dbUserMap = {
@@ -36,7 +37,21 @@ var common = {},
         'app_version': 'av',
         'last_begin_session_timestamp': 'lbst',
         'last_end_session_timestamp': 'lest',
-        'has_ongoing_session': 'hos'
+        'has_ongoing_session': 'hos',
+
+        'tokens': 'tk',
+        'apn_prod': 'ip',                   // production
+        'apn_0': 'ip',                      // production
+        'apn_dev': 'id',                    // development
+        'apn_1': 'id',                      // development
+        'apn_adhoc': 'ia',                  // ad hoc
+        'apn_2': 'ia',                      // ad hoc
+        'gcm_prod': 'ap',                   // production
+        'gcm_0': 'ap',                      // production
+        'gcm_test': 'at',                   // testing
+        'gcm_2': 'at',                      // testing
+        'locale': 'lo',                     // full ISO locale from device
+        'lang': 'la'                        // language extracted from locale
     };
 
     var dbName;
@@ -205,6 +220,24 @@ var common = {},
         return currDay;
     };
 
+    // getter/setter for dot notatons:
+    // getter: dot({a: {b: {c: 'string'}}}, 'a.b.c') === 'string'
+    // getter: dot({a: {b: {c: 'string'}}}, ['a', 'b', 'c']) === 'string'
+    // setter: dot({a: {b: {c: 'string'}}}, 'a.b.c', 5) === 5
+    // getter: dot({a: {b: {c: 'string'}}}, 'a.b.c') === 5
+    common.dot = function(obj, is, value) {
+        if (typeof is == 'string')
+            return common.dot(obj,is.split('.'), value);
+        else if (is.length==1 && value!==undefined)
+            return obj[is[0]] = value;
+        else if (is.length==0)
+            return obj;
+        else if (!obj)
+            return obj;
+        else
+            return common.dot(obj[is[0]],is.slice(1), value);
+    };
+
     /*
      argProperties = { argName: { required: true, type: 'String', max-length: 25, min-length: 25, exclude-from-ret-obj: false }};
      */
@@ -229,12 +262,22 @@ var common = {},
                         if (toString.call(args[arg]) !== '[object ' + argProperties[arg].type + ']') {
                             return false;
                         }
+                    } else if (argProperties[arg].type === 'URL') {
+                        if (toString.call(args[arg]) !== '[object String]') {
+                            return false;
+                        } else if (args[arg] && args[arg].indexOf('http://') != 0 && args[arg].indexOf('https://') != 0) {
+                            return false;
+                        }
                     } else if (argProperties[arg].type === 'Boolean') {
                         if (!(args[arg] !== true || args[arg] !== false || toString.call(args[arg]) !== '[object Boolean]')) {
                             return false;
                         }
                     } else if (argProperties[arg].type === 'Array') {
                         if (!Array.isArray(args[arg])) {
+                            return false;
+                        }
+                    } else if (argProperties[arg].type === 'Object') {
+                        if (!(typeof args[arg] === 'object')) {
                             return false;
                         }
                     } else {

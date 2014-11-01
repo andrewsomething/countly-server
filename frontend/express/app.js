@@ -9,6 +9,8 @@ var http = require('http'),
     request = require('request'),
     countlyMail = require('../../api/parts/mgmt/mail.js'),
     countlyStats = require('../../api/parts/data/stats.js'),
+    countlyPush = require('../../api/parts/pushly/endpoints.js'),
+    langs = require('../../api/utils/langs.js'),
     countlyConfig = require('./config');
     
     var dbName;
@@ -143,7 +145,9 @@ app.get('/dashboard', function (req, res, next) {
                                 "key":apps[i]["key"],
                                 "category":apps[i]["category"],
                                 "timezone":apps[i]["timezone"],
-                                "country":apps[i]["country"]
+                                "country":apps[i]["country"],
+                                "gcm":apps[i]["gcm"] || {},
+                                "apn":apps[i]["apn"] || {}
                             };
                         }
 
@@ -183,7 +187,9 @@ app.get('/dashboard', function (req, res, next) {
                                 "key":admin_of[i]["key"],
                                 "category":admin_of[i]["category"],
                                 "timezone":admin_of[i]["timezone"],
-                                "country":admin_of[i]["country"]
+                                "country":admin_of[i]["country"],
+                                "gcm":admin_of[i]["gcm"] || {},
+                                "apn":admin_of[i]["apn"] || {}
                             };
                         }
 
@@ -198,7 +204,9 @@ app.get('/dashboard', function (req, res, next) {
                                     "key":user_of[i]["key"],
                                     "category":user_of[i]["category"],
                                     "timezone":user_of[i]["timezone"],
-                                    "country":user_of[i]["country"]
+                                    "country":user_of[i]["country"],
+                                    "gcm":user_of[i]["gcm"] || {},
+                                    "apn":user_of[i]["apn"] || {}
                                 };
                             }
 
@@ -220,7 +228,9 @@ app.get('/dashboard', function (req, res, next) {
                             apps:countlyGlobalApps,
                             admin_apps:countlyGlobalAdminApps,
                             csrf_token:req.session._csrf,
-                            member:member
+                            member:member,
+                            languages: langs.languages,
+                            'locale-distributions': {"544a19d9a72f180000000001": {default: 0.4, ru: 0.2, en: 0.1, tr: 0.1, zh_hant: 0.1}}
                         }, 'countlyGlobal');
 
                         if (settings && !err) {
@@ -666,5 +676,91 @@ app.post('/events/delete', function (req, res, next) {
         return true;
     }
 });
+
+app.post('/apps/certificate', function (req, res, next) {
+    if (!req.files.apns_cert) {
+        res.end();
+        return true;
+    }
+
+    var endpoints = require('../../api/parts/pushly/endpoints.js'),
+        tmp_path = req.files.apns_cert.path,
+        file_name = endpoints.APNCertificateFile(req.body.app_id, req.body.test),
+        target_path = endpoints.APNCertificatePath(req.body.app_id, req.body.test),
+        type = req.files.apns_cert.type;
+
+    console.log(target_path);
+
+    if (type != "application/x-pkcs12") {
+        fs.unlink(tmp_path, function () {});
+        res.send({error: 'Only .p12 files are supported'});
+        return true;
+    }
+
+    fs.rename(tmp_path, target_path, function (err) {
+        if (err) {
+            console.log(err);
+            res.send({error: 'Server error: cannot save file'});
+        } else {
+            var update = {$set:{}};
+            if (req.body.test) {
+                update.$set['apn.test'] = {key: file_name, passphrase: req.body.passphrase};
+            } else {
+                update.$set['apn.prod'] = {key: file_name, passphrase: req.body.passphrase};
+            }
+
+            countlyDb.collection('apps').findAndModify({_id: countlyDb.ObjectID(req.body.app_id)}, [['_id', 1]], update, {new:true}, function(err, app){
+                if (err || !app) res.send({error: 'Server error: cannot find app'});
+                else {
+                    fs.unlink(tmp_path, function () {});
+
+                    var options = {
+                        uri: 'http://' + countlyConfig.api.host + ':' + countlyConfig.api.port + '/i/pushes/check',
+                        method: 'GET',
+                        timeout: 20000,
+                        qs: {
+                            "appId": req.body.app_id,
+                            "platform": 'i',
+                            "test": (req.body.test ? true : false),
+                            "api_key": req.body.api_key
+                        }
+                    };
+
+                    console.log('Executing request: %j', options);
+
+                    request(options, function (error, response, body) {
+                        if (error || !body) {
+                            console.log('Error when checking app: %j, %j', error, body);
+                            res.send({error: 'Couldn\'t check certificate validity'});
+                        } else {
+                            console.log('Response when checking app: %j', body);
+                            try {
+                                body = JSON.parse(body);
+                                if (body.ok) {
+                                    res.send({key: file_name, passphrase: req.body.passphrase});
+                                } else {
+                                    res.send({error: 'Invalid certificate and/or passphrase'});
+                                }
+                            } catch(e) {
+                                res.send({error: 'Server error: bad response from API'});
+                            }
+                        }
+                    });
+
+
+                    // countlyPush.checkApp(req.body.app_id, 'i', req.body.test, function(err){
+                    //     if (err) {
+                    //         res.send(false);
+                    //     } else {
+                    //         res.send(file_name);
+                    //     }
+                    // });
+
+                }
+            });
+        }
+    });
+});
+
 
 app.listen(countlyConfig.web.port, countlyConfig.web.host  || '');

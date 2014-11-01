@@ -81,6 +81,8 @@
             tmp_y,
             currentTotal = 0,
             previousTotal = 0,
+            currentMsgEnabledTotal = 0,
+            previousMsgEnabledTotal = 0,
             currentNew = 0,
             previousNew = 0,
             currentUnique = 0,
@@ -99,38 +101,52 @@
                 tmp_x = countlyCommon.getDescendantProp(_sessionDb, _periodObj.uniquePeriodArr[i]);
                 tmp_x = countlySession.clearSessionObject(tmp_x);
                 currentUnique += tmp_x["u"];
+                currentMsgEnabledTotal += tmp_x["m"];
             }
 
             var tmpUniqObj,
-                tmpCurrentUniq = 0;
+                tmpCurrentUniq = 0,
+                tmpCurrentMsgEnabled = 0;
 
             for (var i = 0; i < (_periodObj.uniquePeriodCheckArr.length); i++) {
                 tmpUniqObj = countlyCommon.getDescendantProp(_sessionDb, _periodObj.uniquePeriodCheckArr[i]);
                 tmpUniqObj = countlySession.clearSessionObject(tmpUniqObj);
                 tmpCurrentUniq += tmpUniqObj["u"];
+                tmpCurrentMsgEnabled += tmpUniqObj["m"];
             }
 
             if (currentUnique > tmpCurrentUniq) {
                 currentUnique = tmpCurrentUniq;
             }
 
+            if (currentMsgEnabledTotal > tmpCurrentMsgEnabled) {
+                currentMsgEnabledTotal = tmpCurrentMsgEnabled;
+            }
+
             for (var i = 0; i < (_periodObj.previousUniquePeriodArr.length); i++) {
                 tmp_y = countlyCommon.getDescendantProp(_sessionDb, _periodObj.previousUniquePeriodArr[i]);
                 tmp_y = countlySession.clearSessionObject(tmp_y);
                 previousUnique += tmp_y["u"];
+                previousMsgEnabledTotal += tmp_y["m"];
             }
 
             var tmpUniqObj2,
-                tmpPreviousUniq = 0;
+                tmpPreviousUniq = 0,
+                tmpPreviousMsgEnabled = 0;
 
             for (var i = 0; i < (_periodObj.previousUniquePeriodCheckArr.length); i++) {
                 tmpUniqObj2 = countlyCommon.getDescendantProp(_sessionDb, _periodObj.previousUniquePeriodCheckArr[i]);
                 tmpUniqObj2 = countlySession.clearSessionObject(tmpUniqObj2);
                 tmpPreviousUniq += tmpUniqObj2["u"];
+                tmpPreviousMsgEnabled += tmpUniqObj2["m"];
             }
 
             if (previousUnique > tmpPreviousUniq) {
                 previousUnique = tmpPreviousUniq;
+            }
+
+            if (currentMsgEnabledTotal > tmpCurrentMsgEnabled) {
+                currentMsgEnabledTotal = tmpCurrentMsgEnabled;
             }
 
             for (var i = 0; i < (_periodObj.currentPeriodArr.length); i++) {
@@ -165,6 +181,8 @@
             previousDuration = tmp_y["d"];
             currentEvents = tmp_x["e"];
             previousEvents = tmp_y["e"];
+            currentMsgEnabledTotal = tmp_x["m"];
+            previousMsgEnabledTotal = tmp_y["m"];
         }
 
         var sessionDuration = (currentDuration / 60),
@@ -181,6 +199,7 @@
             changeReturning = countlyCommon.getPercentChange((previousUnique - previousNew), (currentNew - currentNew)),
             changeEvents = countlyCommon.getPercentChange(previousEvents, currentEvents),
             changeEventsPerUser = countlyCommon.getPercentChange(previousEventsPerUser, eventsPerUser),
+            changeMsgEnabled = countlyCommon.getPercentChange(previousMsgEnabledTotal, currentMsgEnabledTotal),
             sparkLines = calcSparklineData();
 
         var timeSpentString = (sessionDuration.toFixed(1)) + " " + jQuery.i18n.map["common.minute.abrv"];
@@ -207,6 +226,14 @@
                     "change":changeUnique.percent,
                     "trend":changeUnique.trend,
                     "sparkline":sparkLines.unique,
+                    "isEstimate":isEstimate
+                },
+                "messaging-users":{
+                    "total":currentMsgEnabledTotal,
+                    "prev-total":previousMsgEnabledTotal,
+                    "change":changeMsgEnabled.percent,
+                    "trend":changeMsgEnabled.trend,
+                    "sparkline":sparkLines.msg,
                     "isEstimate":isEstimate
                 },
                 "new-users":{
@@ -384,6 +411,24 @@
         return countlyCommon.extractChartData(_sessionDb, countlySession.clearSessionObject, chartData, dataProps);
     };
 
+    countlySession.getMsgUserDPActive = function () {
+
+        var chartData = [
+                { data:[], label:jQuery.i18n.map["common.table.total-users"], color: countlyCommon.GRAPH_COLORS[0]},
+                { data:[], label:jQuery.i18n.map["common.table.messaging-users"], color:countlyCommon.GRAPH_COLORS[1] }
+            ],
+            dataProps = [
+                {
+                    name:"u",
+                },
+                {
+                    name:"m",
+                }
+            ];
+
+        return countlyCommon.extractChartData(_sessionDb, countlySession.clearSessionObject, chartData, dataProps);
+    };
+
     countlySession.getDurationDP = function () {
 
         var chartData = [
@@ -488,9 +533,10 @@
             if (!obj["u"]) obj["u"] = 0;
             if (!obj["d"]) obj["d"] = 0;
             if (!obj["e"]) obj["e"] = 0;
+            if (!obj["m"]) obj["m"] = 0;
         }
         else {
-            obj = {"t":0, "n":0, "u":0, "d":0, "e":0};
+            obj = {"t":0, "n":0, "u":0, "d":0, "e":0, "m":0};
         }
 
         return obj;
@@ -570,7 +616,7 @@
     //Private Methods
     function calcSparklineData() {
 
-        var sparkLines = {"total":[], "nev":[], "unique":[], "returning":[], "total-time":[], "avg-time":[], "events":[], "avg-events":[]};
+        var sparkLines = {"total":[], "nev":[], "unique":[], "returning":[], "total-time":[], "avg-time":[], "events":[], "avg-events":[], "msg":[]};
 
         if (!_periodObj.isSpecialPeriod) {
             for (var i = _periodObj.periodMin; i < (_periodObj.periodMax + 1); i++) {
@@ -585,6 +631,7 @@
                 sparkLines["avg-time"][sparkLines["avg-time"].length] = (tmp_x["t"] == 0) ? 0 : (tmp_x["d"] / tmp_x["t"]);
                 sparkLines["events"][sparkLines["events"].length] = tmp_x["e"];
                 sparkLines["avg-events"][sparkLines["avg-events"].length] = (tmp_x["u"] == 0) ? 0 : (tmp_x["e"] / tmp_x["u"]);
+                sparkLines["msg"][sparkLines["msg"].length] = tmp_x["m"]; 
             }
         } else {
             for (var i = 0; i < (_periodObj.currentPeriodArr.length); i++) {
@@ -599,6 +646,7 @@
                 sparkLines["avg-time"][sparkLines["avg-time"].length] = (tmp_x["t"] == 0) ? 0 : (tmp_x["d"] / tmp_x["t"]);
                 sparkLines["events"][sparkLines["events"].length] = tmp_x["e"];
                 sparkLines["avg-events"][sparkLines["avg-events"].length] = (tmp_x["u"] == 0) ? 0 : (tmp_x["e"] / tmp_x["u"]);
+                sparkLines["msg"][sparkLines["msg"].length] = tmp_x["m"];
             }
         }
 
