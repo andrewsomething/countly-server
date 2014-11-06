@@ -1,15 +1,15 @@
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
 <!--
-   ______                  __  __     
+   ______                  __  __
   / ____/___  __  ______  / /_/ /_  __
  / /   / __ \/ / / / __ \/ __/ / / / /
-/ /___/ /_/ / /_/ / / / / /_/ / /_/ / 
-\____/\____/\__,_/_/ /_/\__/_/\__, /  
-              http://count.ly/____/   
+/ /___/ /_/ / /_/ / / / / /_/ / /_/ /
+\____/\____/\__,_/_/ /_/\__/_/\__, /
+              http://count.ly/____/
 -->
 <html>
 <head>
-	<title>Countly</title> 
+	<title>Countly</title>
 	<meta name="viewport" content="width=device-width, user-scalable=0, maximum-scale=1.0">
 	<link rel="icon" type="image/png" href="/images/favicon.png">
     <link rel="stylesheet" href="/stylesheets/font-awesome/css/font-awesome.min.css" />
@@ -23,7 +23,7 @@
     <link rel="stylesheet" href="/javascripts/utils/messenger/messenger-theme-future.css" />
 	<script><%- javascript %></script>
 </head>
-<body> 
+<body>
 	<div id="sidebar">
 		<div id="new-install-overlay"></div>
 		<div id="sidebar-top">
@@ -264,12 +264,12 @@
 		<div class="message">
 			<div class="divide-three view-header">
 				<div class="field view-apps">
-					<span class="title" data-localize="push.apps"></span>	
+					<span class="title" data-localize="push.apps"></span>
 					<span class="view-value"></span>
 				</div>
 				<div class="field view-platforms">
 					<div class="view-platforms-holder">
-						<span data-localize="push.platforms"></span>	
+						<span data-localize="push.platforms"></span>
 	                    <div class="os-segment ios"></div>
 	                    <div class="os-segment android"></div>
 					</div>
@@ -277,21 +277,21 @@
 				<div class="test-switch-holder">
 					<input type="checkbox" class="extra-test-check" data-attr="test">
 					<span class="title" data-localize="push.extra-test">
-					</span>	
+					</span>
 				</div>
 				<div class="clearfix"></div>
 			</div>
 			<div class="divide-three divide-large view-header">
 				<div class="field view-type">
-					<div class="title" data-localize="push.type"></div>	
+					<div class="title" data-localize="push.type"></div>
 					<div class="view-value"></div>
 				</div>
 				<div class="field view-date">
-					<div class="title" data-localize="push.date.sent"></div>	
+					<div class="title" data-localize="push.date.sent"></div>
 					<div class="view-value"></div>
 				</div>
 				<div class="field view-sent">
-					<div class="title" data-localize="push.sent"></div>	
+					<div class="title" data-localize="push.sent"></div>
 					<div class="view-value"></div>
 				</div>
 			</div>
@@ -1001,7 +1001,7 @@
                                     </div>
                                 </td>
                             </tr>
-							<tr class="table-edit-prev help-zone-vs" data-help-localize="manage-apps.app-icon">
+							<tr class="help-zone-vs" data-help-localize="manage-apps.app-icon">
 								<td data-localize="management-applications.icon"></td>
 								<td id="app-edit-image">
 									<div class="read">
@@ -1015,20 +1015,20 @@
 									</div>
 								</td>
 							</tr>
-                            <tr class="help-zone-vs" data-help-localize="manage-apps.push-apn-creds">
+                            <tr>
                                 <td data-localize="management-applications.push-apn-creds"></td>
                                 <td id="app-apn-cert" style="padding:0;">
                                     <div class="read">
                                         <table cellspacing="0" style="width:100%;">
-                                            <tr>
+                                            <tr class="help-zone-vs" data-help-localize="manage-apps.push-apn-certificate">
                                                 <td><span data-localize="management-applications.push-apn-creds-test"></span></td>
                                                 <td><i id="push-apn-cert-test-view" class="icon-remove"></i></td>
                                             </tr>
-                                            <tr>
+                                            <tr class="help-zone-vs" data-help-localize="manage-apps.push-apn-certificate">
                                                 <td><span data-localize="management-applications.push-apn-creds-prod"></span></td>
                                                 <td><i id="push-apn-cert-prod-view" class="icon-remove"></i></td>
                                             </tr>
-                                            <tr>
+                                            <tr class="help-zone-vs" data-help-localize="manage-apps.push-apn-id">
                                                 <td><span data-localize="management-applications.push-apn-creds-id"></span></td>
                                                 <td id="apn-app-store-id"></td>
                                             </tr>
@@ -1036,7 +1036,7 @@
                                     </div>
                                     <div class="edit">
                                         <table cellspacing="0" style="width:100%;">
-                                            <tr>
+                                            <tr class="help-zone-vs" data-help-localize="manage-apps.push-apn-certificate">
                                                 <td><span data-localize="management-applications.push-apn-creds-test"></span></td>
                                                 <td>
                                                     <form action="/apps/certificate" enctype="multipart/form-data" id="add-edit-apn-creds-test-form" method="post">
@@ -1047,35 +1047,35 @@
                                                     </form>
                                                 </td>
                                             </tr>
-                                            <tr>
+                                            <tr class="help-zone-vs" data-help-localize="manage-apps.push-apn-certificate">
                                                 <td><span data-localize="management-applications.push-apn-creds-prod"></span></td>
                                                 <td>
                                                     <form action="/apps/certificate" enctype="multipart/form-data" id="add-edit-apn-creds-prod-form" method="post">
                                                         <input type="file" id="apns_cert_prod" name="apns_cert" />
                                                         <input type="hidden" name="app_id" />
                                                         <input placeholder="Passphrase" style="margin-top:5px;" type="text" name="passphrase" />
-                                                        
+
                                                     </form>
                                                 </td>
                                             </tr>
-                                            <tr>
+                                            <tr class="help-zone-vs" data-help-localize="manage-apps.push-apn-id">
                                             	<td><span data-localize="management-applications.push-apn-creds-id"></span></td>
-                                            	<td><input placeholder="App Store ID" style="margin-top:5px;" type="text" id="apn-id" class="help-zone-vs" data-help-localize="manage-apps.push-apn-id" /></td>
+                                            	<td><input placeholder="App Store ID" style="margin-top:5px;" type="text" id="apn-id"  /></td>
                                             </tr>
                                         </table>
                                     </div>
                                 </td>
                             </tr>
-                            <tr class="table-edit-prev help-zone-vs" data-help-localize="manage-apps.push-gcm-creds">
+                            <tr class="table-edit-prev">
                                 <td data-localize="management-applications.push-gcm-creds"></td>
                                 <td id="app-gcm-creds" style="padding:0;">
                                     <div class="read">
                                         <table cellspacing="0" style="width:100%;">
-                                            <tr>
+                                            <tr class="help-zone-vs" data-help-localize="manage-apps.push-gcm-id">
                                                 <td><span data-localize="management-applications.push-gcm-id"></span></td>
                                                 <td id="view-gcm-id"></td>
                                             </tr>
-                                            <tr>
+                                            <tr class="help-zone-vs" data-help-localize="manage-apps.push-gcm-key">
                                                 <td><span data-localize="management-applications.push-gcm-key"></span></td>
                                                 <td id="view-gcm-key"></td>
                                             </tr>
@@ -1083,11 +1083,11 @@
                                     </div>
                                     <div class="edit">
                                         <table cellspacing="0" style="width:100%;">
-                                            <tr>
+                                            <tr class="help-zone-vs" data-help-localize="manage-apps.push-gcm-id">
                                                 <td><span data-localize="management-applications.push-gcm-id"></span></td>
                                                 <td><input id="gcm-id" type="text" value=""></td>
                                             </tr>
-                                            <tr>
+                                            <tr class="help-zone-vs" data-help-localize="manage-apps.push-gcm-key">
                                                 <td><span data-localize="management-applications.push-gcm-key"></span></td>
                                                 <td><input id="gcm-key" type="text" value=""></td>
                                             </tr>
@@ -1253,7 +1253,7 @@
 				<div class="pie-chart-container">
 					<div style="border-right:1px solid #CCC;">
 						<div class="pie-overlay one {{logo-class}}"></div>
-						<div id="dashboard-graph" class="graph" style="margin:0 auto; height:360px; font-family:'Ubuntu';"></div>	
+						<div id="dashboard-graph" class="graph" style="margin:0 auto; height:360px; font-family:'Ubuntu';"></div>
 					</div>
 				</div>
 				<div class="pie-chart-container">
@@ -1551,12 +1551,12 @@
     	        <table id="push-table" cellspacing="0" class="d-table dashboard">
     				<thead>
     					<tr>
-    			            <th class="help-zone-vs" data-localize="management-pushes.message" data-help-localize="manage-pushes.message-view"></th>
-    			            <th class="help-zone-vs" data-localize="management-pushes.app-names" data-help-localize="manage-pushes.app-names-view"></th>
-    			            <th class="help-zone-vs" data-localize="management-pushes.delivered" data-help-localize="manage-pushes.delivered"></th>
-    			            <th class="help-zone-vs" data-localize="management-pushes.status" data-help-localize="manage-pushes.status"></th>
-    			            <th style="width:130px;" class="help-zone-vs" data-localize="management-pushes.created" data-help-localize="manage-pushes.app-names-view"></th>
-    			            <th style="width:130px;" class="help-zone-vs" data-localize="management-pushes.sent-scheduled" data-help-localize="manage-pushes.app-names-view"></th>
+    			            <th class="help-zone-vs" data-localize="push.table.message" data-help-localize="manage-pushes.message-view"></th>
+    			            <th class="help-zone-vs" data-localize="push.table.app-names" data-help-localize="manage-pushes.app-names-view"></th>
+    			            <th class="help-zone-vs" data-localize="push.table.delivered" data-help-localize="manage-pushes.delivered"></th>
+    			            <th class="help-zone-vs" data-localize="push.table.status" data-help-localize="manage-pushes.status"></th>
+    			            <th style="width:130px;" class="help-zone-vs" data-localize="push.table.created" data-help-localize="manage-pushes.app-names-view"></th>
+    			            <th style="width:130px;" class="help-zone-vs" data-localize="push.table.sent-scheduled" data-help-localize="manage-pushes.app-names-view"></th>
     					</tr>
     				</thead>
     				<tbody>
@@ -1582,9 +1582,7 @@
     <script id="template-message-partial" type="text/x-handlebars-template">
         <tr data-mid="{{this._id}}">
             <td class="push-message">
-                {{#if this.messagePerLocale}}
-                    {{this.messagePerLocale.default}}
-                {{/if}}
+            	{{#messageText this}} {{/messageText }}
             </td>
             <td class="push-app-name">{{#appIdsToNames this.apps}}{{/appIdsToNames}}</td>
             <td class="push-delivered">

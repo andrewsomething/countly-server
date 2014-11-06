@@ -312,6 +312,10 @@
             eventsWithoutOrder = [];
 
         for (var i = 0; i < events.length; i++) {
+            if (events[i].indexOf("[CLY]") == 0) {
+                continue;
+            }
+
             var arrayToUse = eventsWithoutOrder;
 
             if (eventOrder.indexOf(events[i]) !== -1) {

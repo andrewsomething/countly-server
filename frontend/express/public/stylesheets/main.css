@@ -693,7 +693,7 @@ table.events-table { width:100%; padding:0; margin:0; }
 	.push-create .push-platforms { display: none; }
 	.push-create a.push-platform { margin-right:10px; color: #6b6b6b; cursor: default; }
 	.push-create a.push-platform i { font-size:30px; }
-	
+
 	.push-create .field.date .details, .push-create .field.link .details { border: 1px solid rgba(0,0,0,0.5); border-radius: 6px; padding: 5px; }
 	.push-create .field.link { display: none; }
 	.push-create .field .cly-select { width: 280px; height: 28px; }
@@ -702,12 +702,12 @@ table.events-table { width:100%; padding:0; margin:0; }
 	.push-create .field.msg { width: 584px; }
 	.push-create .field.msg .details { height: 119px; border: 1px solid rgba(0,0,0,0.5); border-radius: 6px; }
 	.push-create .field.msg .details > div { display: inline-block; }
-	.push-create .field.msg .details .locales { width: 220px; height: 119px; border-top-left-radius: 6px; border-bottom-left-radius: 6px; overflow: hidden; }
+	.push-create .field.msg .details .locales { vertical-align: top; width: 220px; height: 119px; border-top-left-radius: 6px; border-bottom-left-radius: 6px; overflow: hidden; }
 	.push-create .field.msg .details .text { width: 358px; overflow: hidden; height: 119px; }
 	.push-create .field.msg ul { list-style: none; height: 120px; background-color: #fafafa; border-right: 1px solid #b2b2b2; padding: 0; margin: 0; display: block; overflow-y: scroll; overflow-x: hidden; }
 	.push-create .field.msg ul li { display: block; padding: 0; margin: 0; border-bottom: 1px solid #b2b2b2; height: 39px; position: relative; }
 	.push-create .field.msg ul li:last-child { border-bottom: none; }
-	
+
 	.push-create .field.msg ul li > span { display: inline-block; line-height: 39px; white-space:nowrap; text-overflow: ellipsis; overflow: hidden; }
 	.push-create .field.msg ul li .percentage { width: 50px; text-align: center; }
 	.push-create .field.msg ul li .locale { width: 150px; }
@@ -719,24 +719,24 @@ table.events-table { width:100%; padding:0; margin:0; }
 	.push-create .field.msg ul li.selected { background-color: rgba(178, 178, 178, .3); }
 	.push-create .field.msg ul li.selected .icon-remove { opacity: 1; }
 	.push-create .field.msg ul li.selected .icon-ok { opacity: 0; }
-	
+
 	.push-create .field.msg ul li.set .icon-remove { opacity: 0; }
 	.push-create .field.msg ul li.set .icon-ok { opacity: 1; }
-	
+
 	.push-create .field.msg ul li.selected.set .icon-remove { opacity: 1; }
 	.push-create .field.msg ul li.selected.set .icon-ok { opacity: 0; }
-	
+
 	.push-create .field.msg ul li:hover span[class^="icon"] { opacity: 0; }
 	.push-create .field.msg ul li.selected:hover .icon-remove { opacity: 1; }
 	.push-create .field.msg ul li.set:hover .icon-remove { opacity: 1; }
 
-	.push-create .field.msg .locales.view-locales li .icon-remove, 
-	.push-create .field.msg .locales.view-locales li:hover .icon-remove, 
-	.push-create .field.msg .locales.view-locales li.selected .icon-remove, 
-	.push-create .field.msg .locales.view-locales li.selected:hover .icon-remove, 
-	.push-create .field.msg .locales.view-locales li.set .icon-remove, 
-	.push-create .field.msg .locales.view-locales li.set:hover .icon-remove, 
-	.push-create .field.msg .locales.view-locales li.selected.set .icon-remove, 
+	.push-create .field.msg .locales.view-locales li .icon-remove,
+	.push-create .field.msg .locales.view-locales li:hover .icon-remove,
+	.push-create .field.msg .locales.view-locales li.selected .icon-remove,
+	.push-create .field.msg .locales.view-locales li.selected:hover .icon-remove,
+	.push-create .field.msg .locales.view-locales li.set .icon-remove,
+	.push-create .field.msg .locales.view-locales li.set:hover .icon-remove,
+	.push-create .field.msg .locales.view-locales li.selected.set .icon-remove,
 	.push-create .field.msg .locales.view-locales li.selected.set:hover .icon-remove { display: none; }
 
 	.push-create .field.extras { width: 584px; }

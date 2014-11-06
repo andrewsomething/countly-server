@@ -14,7 +14,7 @@
 
         if (!countlyCommon.DEBUG) {
             _activeAppKey = countlyCommon.ACTIVE_APP_KEY;
-            _initialized = true; 
+            _initialized = true;
 
             return $.when(
                     eventAjax("[CLY]_push_sent"),
@@ -110,10 +110,12 @@
     countlyPushEvents.getDashSummary = function() {
         var events = ["[CLY]_push_sent", "[CLY]_push_open", "[CLY]_push_action"],
             titles = [jQuery.i18n.map["common.sent"], jQuery.i18n.map["common.delivered"], jQuery.i18n.map["common.actions"]],
+            helps = ["dashboard.push.sent", "dashboard.push.delivered","dashboard.push.actions"],
             data = [];
         events.forEach(function(event, i){
             var ev = countlyPushEvents.getDashEventData(event);
             ev.title = titles[i];
+            ev.help = helps[i];
             data.push(ev);
         });
         return data;
