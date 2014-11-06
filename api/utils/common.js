@@ -226,17 +226,18 @@ var common = {},
     // setter: dot({a: {b: {c: 'string'}}}, 'a.b.c', 5) === 5
     // getter: dot({a: {b: {c: 'string'}}}, 'a.b.c') === 5
     common.dot = function(obj, is, value) {
-        if (typeof is == 'string')
+        if (typeof is == 'string') {
             return common.dot(obj,is.split('.'), value);
-        else if (is.length==1 && value!==undefined)
+        } else if (is.length==1 && value!==undefined) {
             obj[is[0]] = value;
             return value;
-        else if (is.length==0)
+        } else if (is.length==0) {
             return obj;
-        else if (!obj)
+        } else if (!obj) {
             return obj;
-        else
+        } else {
             return common.dot(obj[is[0]],is.slice(1), value);
+        }
     };
 
     /*
