@@ -11,8 +11,9 @@ var http = require('http'),
     countlyStats = require('../../api/parts/data/stats.js'),
     countlyPush = require('../../api/parts/pushly/endpoints.js'),
     langs = require('../../api/utils/langs.js'),
-    countlyConfig = require('./config');
-    
+    countlyConfig = require('./config'),
+    apiConfig = require('../../api/config');
+
     var dbName;
     var dbOptions = { safe:true };
 
@@ -677,6 +678,7 @@ app.post('/events/delete', function (req, res, next) {
     }
 });
 
+fs.mkdir(__dirname + '/certificates');
 app.post('/apps/certificate', function (req, res, next) {
     if (!req.files.apns_cert) {
         res.end();
@@ -715,7 +717,7 @@ app.post('/apps/certificate', function (req, res, next) {
                     fs.unlink(tmp_path, function () {});
 
                     var options = {
-                        uri: 'http://' + countlyConfig.api.host + ':' + countlyConfig.api.port + '/i/pushes/check',
+                        uri: 'http://' + apiConfig.api.host + ':' + apiConfig.api.port + '/i/pushes/check',
                         method: 'GET',
                         timeout: 20000,
                         qs: {

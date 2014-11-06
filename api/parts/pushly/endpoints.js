@@ -58,7 +58,7 @@ var pushly 			= require('pushly')(),
                 var obj = {};
                 obj[field] = {$exists: true};
                 $or.push(obj);
-                
+
                 filter[field] = 1;
 
                 // for (i in fields) {
@@ -73,7 +73,7 @@ var pushly 			= require('pushly')(),
                 }
 
                 common.db.collection('app_users' + query.appId).find(finalQuery).count(callback);
-            }, 
+            },
 	    	stream: function(message, query, callback){
 	    		var fields = appUsersFields(message), filter = {}, count = 0, i, finalQuery = {$or: []}, $or = finalQuery.$or;
 
@@ -88,7 +88,7 @@ var pushly 			= require('pushly')(),
                var obj = {};
                obj[field] = {$exists: true};
                $or.push(obj);
-               
+
                filter[field] = 1;
        //          for (i in fields) {
        //              var obj = {};
@@ -139,9 +139,9 @@ var pushly 			= require('pushly')(),
 	    				}
 
 	    				if (unset.length) {
-                            fields.forEach(function(field){ 
+                            fields.forEach(function(field){
                                 $unset[field] = 1;
-                                unsetQuery[field] = {$in: unset}; 
+                                unsetQuery[field] = {$in: unset};
                             });
 		    				common.db.collection('app_users' + app).update(unsetQuery, {$unset: $unset});
 	    				}
@@ -333,7 +333,7 @@ var pushly 			= require('pushly')(),
                 var credentials = api.credentials(message, app);
                 if (credentials.length) {
                     pushlyMessage = message.toPushly(credentials[0], ['test token, which we don\'t really care about'], [app._id, credentials.platform]);
-                    
+
                     pushly.on('status', fun);
                     pushly.push(pushlyMessage);
                 } else {
@@ -359,7 +359,7 @@ var pushly 			= require('pushly')(),
         }
 
         msg.apps = _.map(msg.apps, common.db.ObjectID);
-        
+
         common.db.collection('apps').find({_id: {$in: msg.apps}}).toArray(function(err, apps){
             if (err || !apps || !apps.length) {
                 callback.counters(null, []);
@@ -377,7 +377,7 @@ var pushly 			= require('pushly')(),
                     credentials.forEach(function(creds){
                         counters.push(function(clb){
                             var field = creds.id.split('.')[0],
-                                match = {$match: {}}, 
+                                match = {$match: {}},
                                 group = {$group: {_id: '$' + common.dbUserMap.lang, count: {$sum: 1}}};
                             match.$match[common.dbUserMap.tokens + '.' + field] = {$exists: true};
 
@@ -735,7 +735,7 @@ var pushly 			= require('pushly')(),
     };
 
     api.APNCertificatePath = function(appId, test) {
-        return __dirname + '/../../../frontend/express/public/files/' + api.APNCertificateFile(appId, test);
+        return __dirname + '/../../../frontend/express/certificates/' + api.APNCertificateFile(appId, test);
     };
 
 }(api));
