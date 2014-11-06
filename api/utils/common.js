@@ -229,7 +229,8 @@ var common = {},
         if (typeof is == 'string')
             return common.dot(obj,is.split('.'), value);
         else if (is.length==1 && value!==undefined)
-            return obj[is[0]] = value;
+            obj[is[0]] = value;
+            return value;
         else if (is.length==0)
             return obj;
         else if (!obj)
@@ -277,7 +278,7 @@ var common = {},
                             return false;
                         }
                     } else if (argProperties[arg].type === 'Object') {
-                        if (!(typeof args[arg] === 'object')) {
+                        if (typeof args[arg] !== 'object') {
                             return false;
                         }
                     } else {
