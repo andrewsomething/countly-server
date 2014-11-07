@@ -3369,8 +3369,12 @@ var PushPopup = function(message, duplicate) {
             if (message.sound && !json.sound) {
                 content.find(".extra-sound").after(req.clone());
             }
-            if (message.badge && (!json.badge || !isNumber(json.badge))) {
-                content.find(".extra-badge").after(req.clone());
+            if (message.badge) {
+                if (!json.badge || !isNumber(json.badge)) {
+                    content.find(".extra-badge").after(req.clone());
+                } else {
+                    json.badge = 1 * json.badge;
+                }
             }
             if (message.data && (!json.data || !toJSON(json.data))) {
                 content.find(".extra-data").after(req.clone());
