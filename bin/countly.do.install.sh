@@ -29,11 +29,11 @@ if !(command -v apt-add-repository >/dev/null) then
 fi
 
 #add node.js repo
-echo | apt-add-repository ppa:chris-lea/node.js
+#echo | apt-add-repository ppa:chris-lea/node.js
 
 #add mongodb repo
-echo "deb http://downloads-distro.mongodb.org/repo/ubuntu-upstart dist 10gen" > /etc/apt/sources.list.d/mongodb-10gen-countly.list
-apt-key adv --keyserver keyserver.ubuntu.com --recv 7F0CEB10
+#echo "deb http://downloads-distro.mongodb.org/repo/ubuntu-upstart dist 10gen" > /etc/apt/sources.list.d/mongodb-10gen-countly.list
+#apt-key adv --keyserver keyserver.ubuntu.com --recv 7F0CEB10
 
 #update once more after adding new repos
 apt-get update
@@ -45,7 +45,7 @@ apt-get update
 apt-get -y --force-yes install nodejs || (echo "Failed to install nodejs." ; exit)
 
 #install mongodb
-apt-get -y --force-yes install mongodb-10gen || (echo "Failed to install mongodb." ; exit)
+#apt-get -y --force-yes install mongodb-10gen || (echo "Failed to install mongodb." ; exit)
 
 #install imagemagick
 #apt-get -y install imagemagick
@@ -66,7 +66,6 @@ iptables -A INPUT -m state --state NEW -p tcp --destination-port 27019 -s 0/0 -j
 #install iptables-persistent
 #apt-get install iptables-persistent
 
-${HOME:=$DIR/../api}
 #install time module for node
 ( cd $DIR/../api ; npm install time )
 
