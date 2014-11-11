@@ -29,7 +29,7 @@ if !(command -v apt-add-repository >/dev/null) then
 fi
 
 #add node.js repo
-#echo | apt-add-repository ppa:chris-lea/node.js
+echo | apt-add-repository ppa:chris-lea/node.js
 
 #add mongodb repo
 #echo "deb http://downloads-distro.mongodb.org/repo/ubuntu-upstart dist 10gen" > /etc/apt/sources.list.d/mongodb-10gen-countly.list
