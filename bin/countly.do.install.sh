@@ -66,6 +66,7 @@ iptables -A INPUT -m state --state NEW -p tcp --destination-port 27019 -s 0/0 -j
 #install iptables-persistent
 #apt-get install iptables-persistent
 
+${HOME:=$DIR/../api}
 #install time module for node
 ( cd $DIR/../api ; npm install time )
 
