@@ -1,5 +1,7 @@
 #Countly [![Build Status](https://api.travis-ci.org/Countly/countly-server.png)](https://travis-ci.org/Countly/countly-server)
 
+[![Install on DigitalOcean](http://installer.71m.us/button.svg)](http://installer.71m.us/install?url=https://github.com/ar2rsawseen/countly-server)
+
 **We're hiring:** Countly is looking for developers to work on its core platform. Send us an email (hello at count.ly), including your past experience about Javascript & Node.js, together with Github account name. 
 
 ##What's Countly?
