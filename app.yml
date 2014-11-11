@@ -18,7 +18,6 @@ config:
     - iptables
     - build-essential
     - iptables-persistent
-    - nodejs
     - mongodb
   homedir: /home/root
   runcmd:
