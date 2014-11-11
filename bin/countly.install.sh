@@ -54,7 +54,7 @@ apt-get -y install supervisor || (echo "Failed to install supervisor." ; exit)
 apt-get -y install imagemagick
 
 #install sendmail
-apt-get -y install sendmail
+#apt-get -y install sendmail
 
 #install iptables
 apt-get -y install iptables
@@ -67,7 +67,7 @@ iptables -A INPUT -m state --state NEW -p tcp --destination-port 27019 -s localh
 iptables -A INPUT -m state --state NEW -p tcp --destination-port 27019 -s 0/0 -j DROP
 
 #install iptables-persistent
-apt-get install iptables-persistent
+DEBIAN_FRONTEND=noninteractive apt-get -y install iptables-persistent
 
 #install time module for node
 ( cd $DIR/../api ; npm install time )
