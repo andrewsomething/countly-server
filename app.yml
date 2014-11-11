@@ -10,5 +10,6 @@ config:
       sudo: ['ALL=(ALL) NOPASSWD:ALL']
   packages:
     - git
+    - sendmail
   runcmd:
-    - cd /var && git clone git://github.com/Countly/countly-server.git && cd countly-server && bash bin/countly.install.sh
+    - cd /var && git clone git://github.com/Countly/countly-server.git && cd countly-server && bash bin/countly.do.install.sh
